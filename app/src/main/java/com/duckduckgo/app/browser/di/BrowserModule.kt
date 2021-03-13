@@ -27,18 +27,11 @@ import com.duckduckgo.app.browser.certificates.rootstore.TrustedCertificateStore
 import com.duckduckgo.app.browser.defaultbrowsing.AndroidDefaultBrowserDetector
 import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
 import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserObserver
-import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlInjector
-import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlInjectorJs
-import com.duckduckgo.app.browser.downloader.AndroidFileDownloader
-import com.duckduckgo.app.browser.downloader.DataUriDownloader
-import com.duckduckgo.app.browser.downloader.FileDownloader
-import com.duckduckgo.app.browser.downloader.NetworkFileDownloader
+import com.duckduckgo.app.browser.downloader.*
 import com.duckduckgo.app.browser.favicon.FaviconPersister
 import com.duckduckgo.app.browser.favicon.FileBasedFaviconPersister
-import com.duckduckgo.app.browser.logindetection.DOMLoginDetector
-import com.duckduckgo.app.browser.logindetection.JsLoginDetector
-import com.duckduckgo.app.browser.logindetection.NavigationAwareLoginDetector
-import com.duckduckgo.app.browser.logindetection.NextPageLoginDetection
+import com.duckduckgo.app.browser.httpauth.WebViewHttpAuthStore
+import com.duckduckgo.app.browser.logindetection.*
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.browser.session.WebViewSessionStorage
 import com.duckduckgo.app.browser.tabpreview.FileBasedWebViewPreviewGenerator
@@ -48,13 +41,17 @@ import com.duckduckgo.app.browser.tabpreview.WebViewPreviewPersister
 import com.duckduckgo.app.browser.useragent.UserAgentProvider
 import com.duckduckgo.app.fire.*
 import com.duckduckgo.app.fire.fireproofwebsite.data.FireproofWebsiteDao
+import com.duckduckgo.app.fire.fireproofwebsite.data.FireproofWebsiteRepository
 import com.duckduckgo.app.global.AppUrl
 import com.duckduckgo.app.global.DispatcherProvider
 import com.duckduckgo.app.global.device.DeviceInfo
+import com.duckduckgo.app.global.events.db.UserEventsStore
 import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
 import com.duckduckgo.app.global.file.FileDeleter
 import com.duckduckgo.app.global.install.AppInstallStore
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlManager
 import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
 import com.duckduckgo.app.privacy.db.PrivacyProtectionCountDao
 import com.duckduckgo.app.referral.AppReferrerDataStore
@@ -86,6 +83,7 @@ class BrowserModule {
 
     @Provides
     fun browserWebViewClient(
+        webViewHttpAuthStore: WebViewHttpAuthStore,
         trustedCertificateStore: TrustedCertificateStore,
         requestRewriter: RequestRewriter,
         specialUrlDetector: SpecialUrlDetector,
@@ -95,9 +93,10 @@ class BrowserModule {
         cookieManager: CookieManager,
         loginDetector: DOMLoginDetector,
         dosDetector: DosDetector,
-        globalPrivacyControlInjector: GlobalPrivacyControlInjector
+        globalPrivacyControl: GlobalPrivacyControl
     ): BrowserWebViewClient {
         return BrowserWebViewClient(
+            webViewHttpAuthStore,
             trustedCertificateStore,
             requestRewriter,
             specialUrlDetector,
@@ -107,7 +106,7 @@ class BrowserModule {
             cookieManager,
             loginDetector,
             dosDetector,
-            globalPrivacyControlInjector
+            globalPrivacyControl
         )
     }
 
@@ -140,9 +139,10 @@ class BrowserModule {
         context: Context,
         webViewSessionStorage: WebViewSessionStorage,
         cookieManager: DuckDuckGoCookieManager,
-        fileDeleter: FileDeleter
+        fileDeleter: FileDeleter,
+        webViewHttpAuthStore: WebViewHttpAuthStore
     ): WebDataManager =
-        WebViewDataManager(context, webViewSessionStorage, cookieManager, fileDeleter)
+        WebViewDataManager(context, webViewSessionStorage, cookieManager, fileDeleter, webViewHttpAuthStore)
 
     @Provides
     fun clipboardManager(context: Context): ClipboardManager {
@@ -168,8 +168,10 @@ class BrowserModule {
         resourceSurrogates: ResourceSurrogates,
         trackerDetector: TrackerDetector,
         httpsUpgrader: HttpsUpgrader,
-        privacyProtectionCountDao: PrivacyProtectionCountDao
-    ): RequestInterceptor = WebViewRequestInterceptor(resourceSurrogates, trackerDetector, httpsUpgrader, privacyProtectionCountDao)
+        privacyProtectionCountDao: PrivacyProtectionCountDao,
+        globalPrivacyControl: GlobalPrivacyControl,
+        userAgentProvider: UserAgentProvider
+    ): RequestInterceptor = WebViewRequestInterceptor(resourceSurrogates, trackerDetector, httpsUpgrader, privacyProtectionCountDao, globalPrivacyControl, userAgentProvider)
 
     @Provides
     fun cookieManager(
@@ -247,8 +249,13 @@ class BrowserModule {
     }
 
     @Provides
-    fun navigationAwareLoginDetector(): NavigationAwareLoginDetector {
-        return NextPageLoginDetection()
+    fun blobConverterInjector(): BlobConverterInjector {
+        return BlobConverterInjectorJs()
+    }
+
+    @Provides
+    fun navigationAwareLoginDetector(settingsDataStore: SettingsDataStore): NavigationAwareLoginDetector {
+        return NextPageLoginDetection(settingsDataStore)
     }
 
     @Provides
@@ -257,7 +264,19 @@ class BrowserModule {
     }
 
     @Provides
-    fun doNotSell(appSettingsPreferencesStore: SettingsDataStore): GlobalPrivacyControlInjector {
-        return GlobalPrivacyControlInjectorJs(appSettingsPreferencesStore)
+    fun doNotSell(appSettingsPreferencesStore: SettingsDataStore): GlobalPrivacyControl {
+        return GlobalPrivacyControlManager(appSettingsPreferencesStore)
+    }
+
+    @Provides
+    fun fireproofLoginDialogEventHandler(
+        userEventsStore: UserEventsStore,
+        pixel: Pixel,
+        fireproofWebsiteRepository: FireproofWebsiteRepository,
+        appSettingsPreferencesStore: SettingsDataStore,
+        variantManager: VariantManager,
+        dispatchers: DispatcherProvider
+    ): FireproofDialogsEventHandler {
+        return BrowserTabFireproofDialogsEventHandler(userEventsStore, pixel, fireproofWebsiteRepository, appSettingsPreferencesStore, variantManager, dispatchers)
     }
 }

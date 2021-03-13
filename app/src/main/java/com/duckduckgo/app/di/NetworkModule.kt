@@ -21,14 +21,15 @@ import androidx.work.WorkManager
 import com.duckduckgo.app.autocomplete.api.AutoCompleteService
 import com.duckduckgo.app.brokensite.api.BrokenSiteSender
 import com.duckduckgo.app.brokensite.api.BrokenSiteSubmitter
+import com.duckduckgo.app.browser.useragent.UserAgentProvider
 import com.duckduckgo.app.feedback.api.FeedbackService
 import com.duckduckgo.app.feedback.api.FeedbackSubmitter
 import com.duckduckgo.app.feedback.api.FireAndForgetFeedbackSubmitter
 import com.duckduckgo.app.feedback.api.SubReasonApiMapper
 import com.duckduckgo.app.global.AppUrl.Url
-import com.duckduckgo.app.global.api.ApiRequestInterceptor
-import com.duckduckgo.app.global.api.NetworkApiCache
+import com.duckduckgo.app.global.api.*
 import com.duckduckgo.app.global.job.AppConfigurationSyncWorkRequestBuilder
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
 import com.duckduckgo.app.httpsupgrade.api.HttpsUpgradeService
 import com.duckduckgo.app.job.AppConfigurationSyncer
 import com.duckduckgo.app.job.ConfigurationDownloader
@@ -39,7 +40,6 @@ import com.duckduckgo.app.surrogates.api.ResourceSurrogateListService
 import com.duckduckgo.app.survey.api.SurveyService
 import com.duckduckgo.app.trackerdetection.api.TrackerListService
 import com.duckduckgo.app.trackerdetection.db.TdsMetadataDao
-import com.jakewharton.retrofit2.adapter.kotlin.coroutines.CoroutineCallAdapterFactory
 import com.squareup.moshi.Moshi
 import dagger.Module
 import dagger.Provides
@@ -71,9 +71,13 @@ class NetworkModule {
     @Provides
     @Singleton
     @Named("nonCaching")
-    fun pixelOkHttpClient(apiRequestInterceptor: ApiRequestInterceptor): OkHttpClient {
+    fun pixelOkHttpClient(
+        apiRequestInterceptor: ApiRequestInterceptor,
+        pixelReQueryInterceptor: PixelReQueryInterceptor,
+    ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(apiRequestInterceptor)
+            .addInterceptor(pixelReQueryInterceptor)
             .build()
     }
 
@@ -86,7 +90,6 @@ class NetworkModule {
             .client(okHttpClient)
             .addConverterFactory(ScalarsConverterFactory.create())
             .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
-            .addCallAdapterFactory(CoroutineCallAdapterFactory())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
     }
@@ -104,8 +107,16 @@ class NetworkModule {
     }
 
     @Provides
-    fun apiRequestInterceptor(context: Context): ApiRequestInterceptor {
-        return ApiRequestInterceptor(context)
+    fun apiRequestInterceptor(
+        context: Context,
+        userAgentProvider: UserAgentProvider
+    ): ApiRequestInterceptor {
+        return ApiRequestInterceptor(context, userAgentProvider)
+    }
+
+    @Provides
+    fun pixelReQueryInterceptor(): PixelReQueryInterceptor {
+        return PixelReQueryInterceptor()
     }
 
     @Provides
@@ -129,9 +140,10 @@ class NetworkModule {
         statisticsStore: StatisticsDataStore,
         variantManager: VariantManager,
         tdsMetadataDao: TdsMetadataDao,
-        pixel: Pixel
+        pixel: Pixel,
+        globalPrivacyControl: GlobalPrivacyControl
     ): BrokenSiteSender =
-        BrokenSiteSubmitter(statisticsStore, variantManager, tdsMetadataDao, pixel)
+        BrokenSiteSubmitter(statisticsStore, variantManager, tdsMetadataDao, globalPrivacyControl, pixel)
 
     @Provides
     fun surveyService(@Named("api") retrofit: Retrofit): SurveyService =

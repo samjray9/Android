@@ -24,26 +24,33 @@ import com.duckduckgo.app.browser.favicon.FaviconModule
 import com.duckduckgo.app.browser.rating.di.RatingModule
 import com.duckduckgo.app.global.DuckDuckGoApplication
 import com.duckduckgo.app.global.exception.UncaughtExceptionModule
+import com.duckduckgo.app.global.plugins.worker.WorkerPluginsModule
 import com.duckduckgo.app.httpsupgrade.di.HttpsUpgraderModule
 import com.duckduckgo.app.onboarding.di.OnboardingModule
+import com.duckduckgo.app.onboarding.di.WelcomePageModule
 import com.duckduckgo.app.surrogates.di.ResourceSurrogateModule
 import com.duckduckgo.app.trackerdetection.di.TrackerDetectionModule
 import com.duckduckgo.app.usage.di.AppUsageModule
+import com.duckduckgo.di.scopes.AppObjectGraph
 import com.duckduckgo.widget.SearchWidget
+import com.squareup.anvil.annotations.MergeComponent
 import dagger.BindsInstance
 import dagger.Component
 import dagger.android.AndroidInjector
 import dagger.android.support.AndroidSupportInjectionModule
 import kotlinx.coroutines.CoroutineScope
+import retrofit2.Retrofit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
-@Component(
+@MergeComponent(
+    scope = AppObjectGraph::class,
     modules = [
+        WorkerPluginsModule::class,
         ApplicationModule::class,
         JobsModule::class,
         WorkerModule::class,
-        AndroidBindingModule::class,
         AndroidSupportInjectionModule::class,
         NetworkModule::class,
         AppConfigurationDownloaderModule::class,
@@ -68,9 +75,11 @@ import javax.inject.Singleton
         AppUsageModule::class,
         FileModule::class,
         UncaughtExceptionModule::class,
-        PlayStoreReferralModule::class,
+        StoreReferralModule::class,
         CoroutinesModule::class,
-        CertificateTrustedStoreModule::class
+        CertificateTrustedStoreModule::class,
+        WelcomePageModule::class,
+        HttpsPersisterModule::class
     ]
 )
 interface AppComponent : AndroidInjector<DuckDuckGoApplication> {
@@ -88,4 +97,8 @@ interface AppComponent : AndroidInjector<DuckDuckGoApplication> {
     }
 
     fun inject(searchWidget: SearchWidget)
+
+    // accessor to Retrofit instance for test only only for test
+    @Named("api")
+    fun retrofit(): Retrofit
 }

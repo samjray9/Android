@@ -20,6 +20,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Message
+import android.util.Patterns
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.view.View
@@ -37,6 +38,7 @@ import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteResult
 import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteSuggestion
 import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteSuggestion.AutoCompleteBookmarkSuggestion
 import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteSuggestion.AutoCompleteSearchSuggestion
+import com.duckduckgo.app.autocomplete.api.AutoCompleteApi
 import com.duckduckgo.app.bookmarks.db.BookmarkEntity
 import com.duckduckgo.app.bookmarks.db.BookmarksDao
 import com.duckduckgo.app.bookmarks.ui.EditBookmarkDialogFragment.EditBookmarkListener
@@ -51,6 +53,8 @@ import com.duckduckgo.app.browser.addtohome.AddToHomeCapabilityDetector
 import com.duckduckgo.app.browser.downloader.DownloadFailReason
 import com.duckduckgo.app.browser.downloader.FileDownloader
 import com.duckduckgo.app.browser.favicon.FaviconManager
+import com.duckduckgo.app.browser.logindetection.FireproofDialogsEventHandler
+import com.duckduckgo.app.browser.logindetection.FireproofDialogsEventHandler.Event
 import com.duckduckgo.app.browser.logindetection.LoginDetected
 import com.duckduckgo.app.browser.logindetection.NavigationAwareLoginDetector
 import com.duckduckgo.app.browser.logindetection.NavigationEvent
@@ -58,6 +62,7 @@ import com.duckduckgo.app.browser.model.BasicAuthenticationCredentials
 import com.duckduckgo.app.browser.model.BasicAuthenticationRequest
 import com.duckduckgo.app.browser.model.LongPressTarget
 import com.duckduckgo.app.browser.omnibar.OmnibarEntryConverter
+import com.duckduckgo.app.browser.omnibar.QueryUrlConverter
 import com.duckduckgo.app.browser.session.WebViewSessionStorage
 import com.duckduckgo.app.browser.ui.HttpAuthenticationDialogFragment.HttpAuthenticationListener
 import com.duckduckgo.app.cta.ui.*
@@ -70,10 +75,12 @@ import com.duckduckgo.app.global.model.Site
 import com.duckduckgo.app.global.model.SiteFactory
 import com.duckduckgo.app.global.model.domain
 import com.duckduckgo.app.global.model.domainMatchesUrl
+import com.duckduckgo.app.global.plugins.view_model.ViewModelFactoryPlugin
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector.Companion.USE_OUR_APP_SHORTCUT_TITLE
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector.Companion.USE_OUR_APP_SHORTCUT_URL
 import com.duckduckgo.app.global.view.asLocationPermissionOrigin
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
 import com.duckduckgo.app.location.GeoLocationPermissions
 import com.duckduckgo.app.location.data.LocationPermissionType
 import com.duckduckgo.app.location.data.LocationPermissionsRepository
@@ -96,7 +103,12 @@ import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.model.TabRepository
 import com.duckduckgo.app.trackerdetection.model.TrackingEvent
 import com.duckduckgo.app.usage.search.SearchCountDao
+import com.duckduckgo.di.scopes.AppObjectGraph
 import com.jakewharton.rxrelay2.PublishRelay
+import com.squareup.anvil.annotations.ContributesTo
+import dagger.Module
+import dagger.Provides
+import dagger.multibindings.IntoSet
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
@@ -105,6 +117,7 @@ import timber.log.Timber
 import java.io.File
 import java.util.*
 import java.util.concurrent.TimeUnit
+import javax.inject.Singleton
 
 class BrowserTabViewModel(
     private val statisticsUpdater: StatisticsUpdater,
@@ -134,7 +147,9 @@ class BrowserTabViewModel(
     private val notificationDao: NotificationDao,
     private val useOurAppDetector: UseOurAppDetector,
     private val variantManager: VariantManager,
-    private val fileDownloader: FileDownloader
+    private val fileDownloader: FileDownloader,
+    private val globalPrivacyControl: GlobalPrivacyControl,
+    private val fireproofDialogsEventHandler: FireproofDialogsEventHandler
 ) : WebViewClientListener, EditBookmarkListener, HttpAuthenticationListener, SiteLocationPermissionDialog.SiteLocationPermissionDialogListener,
     SystemLocationPermissionDialog.SystemLocationPermissionDialogListener, ViewModel() {
 
@@ -212,7 +227,7 @@ class BrowserTabViewModel(
         val shouldAnimate: Boolean = false,
         val showEmptyGrade: Boolean = true
     ) {
-        val isEnabled: Boolean = !showEmptyGrade && privacyGrade != PrivacyGrade.UNKNOWN
+        val isEnabled: Boolean = privacyGrade != PrivacyGrade.UNKNOWN
     }
 
     data class AutoCompleteViewState(
@@ -241,6 +256,7 @@ class BrowserTabViewModel(
         class DownloadImage(val url: String, val requestUserConfirmation: Boolean) : Command()
         class ShowBookmarkAddedConfirmation(val bookmarkId: Long, val title: String?, val url: String?) : Command()
         class ShowFireproofWebSiteConfirmation(val fireproofWebsiteEntity: FireproofWebsiteEntity) : Command()
+        object AskToDisableLoginDetection : Command()
         class AskToFireproofWebsite(val fireproofWebsite: FireproofWebsiteEntity) : Command()
         class ShareLink(val url: String) : Command()
         class CopyLink(val url: String) : Command()
@@ -262,9 +278,11 @@ class BrowserTabViewModel(
         class CheckSystemLocationPermission(val domain: String, val deniedForever: Boolean) : Command()
         class AskDomainPermission(val domain: String) : Command()
         object RequestSystemLocationPermission : Command()
-        class RefreshUserAgent(val host: String?, val isDesktop: Boolean) : Command()
+        class RefreshUserAgent(val url: String?, val isDesktop: Boolean) : Command()
         class ShowErrorWithAction(val textResId: Int, val action: () -> Unit) : Command()
         class ShowDomainHasPermissionMessage(val domain: String) : Command()
+        class ConvertBlobToDataUri(val url: String, val mimeType: String) : Command()
+        class RequestFileDownload(val url: String, val contentDisposition: String?, val mimeType: String, val requestUserConfirmation: Boolean) : Command()
         sealed class DaxCommand : Command() {
             object FinishTrackerAnimation : DaxCommand()
             class HideDaxDialog(val cta: Cta) : DaxCommand()
@@ -325,7 +343,13 @@ class BrowserTabViewModel(
         browserViewState.value = currentBrowserViewState().copy(isFireproofWebsite = isFireproofWebsite())
     }
 
-    @ExperimentalCoroutinesApi
+    private val fireproofDialogEventObserver = Observer<Event> { event ->
+        command.value = when (event) {
+            is Event.AskToDisableLoginDetection -> AskToDisableLoginDetection
+            is Event.FireproofWebSiteSuccess -> ShowFireproofWebSiteConfirmation(event.fireproofWebsiteEntity)
+        }
+    }
+
     private val fireButtonAnimation = Observer<Boolean> { shouldShowAnimation ->
         Timber.i("shouldShowAnimation $shouldShowAnimation")
         if (currentBrowserViewState().fireButton is FireButton.Visible) {
@@ -337,7 +361,6 @@ class BrowserTabViewModel(
         }
     }
 
-    @ExperimentalCoroutinesApi
     private fun registerAndScheduleDismissAction() {
         viewModelScope.launch(dispatchers.io()) {
             val fireButtonHighlightedEvent = userEventsStore.getUserEvent(UserEventKey.FIRE_BUTTON_HIGHLIGHTED)
@@ -353,11 +376,14 @@ class BrowserTabViewModel(
 
     private val loginDetectionObserver = Observer<LoginDetected> { loginEvent ->
         Timber.i("LoginDetection for $loginEvent")
-        viewModelScope.launch { useOurAppDetector.registerIfFireproofSeenForTheFirstTime(loginEvent.forwardedToDomain) }
+        viewModelScope.launch(dispatchers.io()) {
+            useOurAppDetector.registerIfFireproofSeenForTheFirstTime(loginEvent.forwardedToDomain)
 
-        if (!isFireproofWebsite(loginEvent.forwardedToDomain)) {
-            pixel.fire(PixelName.FIREPROOF_LOGIN_DIALOG_SHOWN)
-            command.value = AskToFireproofWebsite(FireproofWebsiteEntity(loginEvent.forwardedToDomain))
+            if (!isFireproofWebsite(loginEvent.forwardedToDomain)) {
+                withContext(dispatchers.main()) {
+                    command.value = AskToFireproofWebsite(FireproofWebsiteEntity(loginEvent.forwardedToDomain))
+                }
+            }
         }
     }
 
@@ -365,6 +391,7 @@ class BrowserTabViewModel(
         initializeViewStates()
         configureAutoComplete()
         fireproofWebsiteState.observeForever(fireproofWebsitesObserver)
+        fireproofDialogsEventHandler.event.observeForever(fireproofDialogEventObserver)
         navigationAwareLoginDetector.loginEventLiveData.observeForever(loginDetectionObserver)
         showPulseAnimation.observeForever(fireButtonAnimation)
     }
@@ -424,9 +451,8 @@ class BrowserTabViewModel(
     }
 
     private fun onAutoCompleteResultReceived(result: AutoCompleteResult) {
-        val results = result.suggestions.take(6)
         val currentViewState = currentAutoCompleteViewState()
-        autoCompleteViewState.value = currentViewState.copy(searchResults = AutoCompleteResult(result.query, results))
+        autoCompleteViewState.value = currentViewState.copy(searchResults = AutoCompleteResult(result.query, result.suggestions))
     }
 
     @VisibleForTesting
@@ -436,6 +462,7 @@ class BrowserTabViewModel(
         autoCompleteDisposable = null
         fireproofWebsiteState.removeObserver(fireproofWebsitesObserver)
         navigationAwareLoginDetector.loginEventLiveData.removeObserver(loginDetectionObserver)
+        fireproofDialogsEventHandler.event.removeObserver(fireproofDialogEventObserver)
         showPulseAnimation.removeObserver(fireButtonAnimation)
         super.onCleared()
     }
@@ -526,13 +553,7 @@ class BrowserTabViewModel(
         autoCompleteViewState.value = AutoCompleteViewState(false)
     }
 
-    private fun getUrlHeaders(): Map<String, String> {
-        return if (appSettingsPreferencesStore.globalPrivacyControlEnabled) {
-            mapOf(GPC_HEADER to GPC_HEADER_VALUE)
-        } else {
-            emptyMap()
-        }
-    }
+    private fun getUrlHeaders(): Map<String, String> = globalPrivacyControl.getHeaders()
 
     private fun extractVerticalParameter(currentUrl: String?): String? {
         val url = currentUrl ?: return null
@@ -548,9 +569,11 @@ class BrowserTabViewModel(
         val oldQuery = currentOmnibarViewState().omnibarText.toUri()
         val newQuery = omnibarText.toUri()
 
+        if (Patterns.WEB_URL.matcher(oldQuery.toString()).matches()) return
+
         if (oldQuery == newQuery) {
             pixel.fire(String.format(Locale.US, PixelName.SERP_REQUERY.pixelName, PixelParameter.SERP_QUERY_NOT_CHANGED))
-        } else {
+        } else if (oldQuery.toString().isNotBlank()) { // blank means no previous search, don't send pixel
             pixel.fire(String.format(Locale.US, PixelName.SERP_REQUERY.pixelName, PixelParameter.SERP_QUERY_CHANGED))
         }
     }
@@ -568,6 +591,7 @@ class BrowserTabViewModel(
     }
 
     override fun willOverrideUrl(newUrl: String) {
+        navigationAwareLoginDetector.onEvent(NavigationEvent.Redirect(newUrl))
         val previousSiteStillLoading = currentLoadingViewState().isLoading
         if (previousSiteStillLoading) {
             showBlankContentfNewContentDelayed()
@@ -594,6 +618,8 @@ class BrowserTabViewModel(
             }
         }
     }
+
+    override fun isDesktopSiteEnabled(): Boolean = currentBrowserViewState().isDesktopBrowsingMode
 
     override fun closeCurrentTab() {
         viewModelScope.launch { removeCurrentTabFromRepository() }
@@ -625,6 +651,10 @@ class BrowserTabViewModel(
     }
 
     fun onRefreshRequested() {
+        val omnibarContent = currentOmnibarViewState().omnibarText
+        if (!Patterns.WEB_URL.matcher(omnibarContent).matches()) {
+            fireQueryChangedPixel(currentOmnibarViewState().omnibarText)
+        }
         navigationAwareLoginDetector.onEvent(NavigationEvent.UserAction.Refresh)
         if (currentGlobalLayoutState() is Invalidated) {
             recoverTabWithQuery(url.orEmpty())
@@ -754,8 +784,6 @@ class BrowserTabViewModel(
         if (!useOurAppDetector.isUseOurAppUrl(previousUrl)) {
             sendPixelIfUseOurAppSiteVisitedFirstTime(url)
         }
-
-        command.value = RefreshUserAgent(site?.uri?.host, currentBrowserViewState().isDesktopBrowsingMode)
 
         val currentOmnibarViewState = currentOmnibarViewState()
         omnibarViewState.value = currentOmnibarViewState.copy(omnibarText = omnibarTextForUrl(url), shouldMoveCaretToEnd = false)
@@ -918,6 +946,7 @@ class BrowserTabViewModel(
     override fun progressChanged(newProgress: Int) {
         Timber.v("Loading in progress $newProgress")
         if (!currentBrowserViewState().browserShowing) return
+
         val isLoading = newProgress < 100
         val progress = currentLoadingViewState()
         if (progress.progress == newProgress) return
@@ -926,11 +955,14 @@ class BrowserTabViewModel(
         } else {
             newProgress
         }
+
         loadingViewState.value = progress.copy(isLoading = isLoading, progress = visualProgress)
 
         val showLoadingGrade = progress.privacyOn || isLoading
         privacyGradeViewState.value = currentPrivacyGradeState().copy(shouldAnimate = isLoading, showEmptyGrade = showLoadingGrade)
+
         if (newProgress == 100) {
+            command.value = RefreshUserAgent(url, currentBrowserViewState().isDesktopBrowsingMode)
             navigationAwareLoginDetector.onEvent(NavigationEvent.PageFinished)
         }
     }
@@ -1277,17 +1309,40 @@ class BrowserTabViewModel(
         }
     }
 
+    fun onFireproofLoginDialogShown() {
+        viewModelScope.launch {
+            fireproofDialogsEventHandler.onFireproofLoginDialogShown()
+        }
+    }
+
     fun onUserConfirmedFireproofDialog(domain: String) {
         viewModelScope.launch {
-            fireproofWebsiteRepository.fireproofWebsite(domain)?.let {
-                pixel.fire(PixelName.FIREPROOF_WEBSITE_LOGIN_ADDED)
-                command.value = ShowFireproofWebSiteConfirmation(fireproofWebsiteEntity = it)
-            }
+            fireproofDialogsEventHandler.onUserConfirmedFireproofDialog(domain)
         }
     }
 
     fun onUserDismissedFireproofLoginDialog() {
-        pixel.fire(PixelName.FIREPROOF_WEBSITE_LOGIN_DISMISS)
+        viewModelScope.launch {
+            fireproofDialogsEventHandler.onUserDismissedFireproofLoginDialog()
+        }
+    }
+
+    fun onDisableLoginDetectionDialogShown() {
+        viewModelScope.launch(dispatchers.io()) {
+            fireproofDialogsEventHandler.onDisableLoginDetectionDialogShown()
+        }
+    }
+
+    fun onUserConfirmedDisableLoginDetectionDialog() {
+        viewModelScope.launch(dispatchers.io()) {
+            fireproofDialogsEventHandler.onUserConfirmedDisableLoginDetectionDialog()
+        }
+    }
+
+    fun onUserDismissedDisableLoginDetectionDialog() {
+        viewModelScope.launch(dispatchers.io()) {
+            fireproofDialogsEventHandler.onUserDismissedDisableLoginDetectionDialog()
+        }
     }
 
     fun onFireproofWebsiteSnackbarUndoClicked(fireproofWebsiteEntity: FireproofWebsiteEntity) {
@@ -1430,7 +1485,7 @@ class BrowserTabViewModel(
     fun onDesktopSiteModeToggled(desktopSiteRequested: Boolean) {
         val currentBrowserViewState = currentBrowserViewState()
         browserViewState.value = currentBrowserViewState.copy(isDesktopBrowsingMode = desktopSiteRequested)
-        command.value = RefreshUserAgent(site?.uri?.host, desktopSiteRequested)
+        command.value = RefreshUserAgent(site?.uri?.toString(), desktopSiteRequested)
 
         val uri = site?.uri ?: return
 
@@ -1575,9 +1630,6 @@ class BrowserTabViewModel(
         }
     }
 
-    fun onUserClickTopCta(cta: HomeTopPanelCta) {
-    }
-
     fun onUserClickCtaOkButton() {
         val cta = currentCtaViewState().cta ?: return
         ctaViewModel.onUserClickCtaOkButton(cta)
@@ -1623,9 +1675,6 @@ class BrowserTabViewModel(
         viewModelScope.launch {
             ctaViewModel.onUserDismissedCta(cta)
             when (cta) {
-                is HomeTopPanelCta -> {
-                    ctaViewState.value = currentCtaViewState().copy(cta = null)
-                }
                 is HomePanelCta -> refreshCta()
                 else -> ctaViewState.value = currentCtaViewState().copy(cta = null)
             }
@@ -1710,9 +1759,25 @@ class BrowserTabViewModel(
         command.value = OpenInNewTab(query)
     }
 
+    override fun redirectTriggeredByGpc() {
+        navigationAwareLoginDetector.onEvent(NavigationEvent.GpcRedirect)
+    }
+
     override fun loginDetected() {
         val currentUrl = site?.url ?: return
         navigationAwareLoginDetector.onEvent(NavigationEvent.LoginAttempt(currentUrl))
+    }
+
+    fun requestFileDownload(url: String, contentDisposition: String?, mimeType: String, requestUserConfirmation: Boolean) {
+        if (url.startsWith("blob:")) {
+            command.value = ConvertBlobToDataUri(url, mimeType)
+        } else {
+            sendRequestFileDownloadCommand(url, contentDisposition, mimeType, requestUserConfirmation)
+        }
+    }
+
+    private fun sendRequestFileDownloadCommand(url: String, contentDisposition: String?, mimeType: String, requestUserConfirmation: Boolean) {
+        command.postValue(RequestFileDownload(url, contentDisposition, mimeType, requestUserConfirmation))
     }
 
     fun download(pendingFileDownload: FileDownloader.PendingFileDownload) {
@@ -1762,13 +1827,126 @@ class BrowserTabViewModel(
 
     companion object {
         private const val FIXED_PROGRESS = 50
-        const val GPC_HEADER = "Sec-GPC"
-        const val GPC_HEADER_VALUE = "1"
 
         // Minimum progress to show web content again after decided to hide web content (possible spoofing attack).
         // We think that progress is enough to assume next site has already loaded new content.
         private const val SHOW_CONTENT_MIN_PROGRESS = 50
         private const val NEW_CONTENT_MAX_DELAY_MS = 1000L
         private const val ONE_HOUR_IN_MS = 3_600_000
+    }
+}
+
+@Module
+@ContributesTo(AppObjectGraph::class)
+class BrowserTabViewModelFactoryModule {
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideBrowserTabViewModelFactory(
+        statisticsUpdater: StatisticsUpdater,
+        queryUrlConverter: QueryUrlConverter,
+        duckDuckGoUrlDetector: DuckDuckGoUrlDetector,
+        siteFactory: SiteFactory,
+        tabRepository: TabRepository,
+        userWhitelistDao: UserWhitelistDao,
+        networkLeaderboardDao: NetworkLeaderboardDao,
+        bookmarksDao: BookmarksDao,
+        fireproofWebsiteRepository: FireproofWebsiteRepository,
+        locationPermissionsRepository: LocationPermissionsRepository,
+        geoLocationPermissions: GeoLocationPermissions,
+        navigationAwareLoginDetector: NavigationAwareLoginDetector,
+        autoCompleteApi: AutoCompleteApi,
+        appSettingsPreferencesStore: SettingsDataStore,
+        longPressHandler: LongPressHandler,
+        webViewSessionStorage: WebViewSessionStorage,
+        specialUrlDetector: SpecialUrlDetector,
+        faviconManager: FaviconManager,
+        addToHomeCapabilityDetector: AddToHomeCapabilityDetector,
+        ctaViewModel: CtaViewModel,
+        searchCountDao: SearchCountDao,
+        pixel: Pixel,
+        dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+        userEventsStore: UserEventsStore,
+        notificationDao: NotificationDao,
+        useOurAppDetector: UseOurAppDetector,
+        variantManager: VariantManager,
+        fileDownloader: FileDownloader,
+        globalPrivacyControl: GlobalPrivacyControl,
+        fireproofDialogsEventHandler: FireproofDialogsEventHandler
+    ): ViewModelFactoryPlugin {
+        return BrowserTabViewModelFactory(
+            statisticsUpdater,
+            queryUrlConverter,
+            duckDuckGoUrlDetector,
+            siteFactory,
+            tabRepository,
+            userWhitelistDao,
+            networkLeaderboardDao,
+            bookmarksDao,
+            fireproofWebsiteRepository,
+            locationPermissionsRepository,
+            geoLocationPermissions,
+            navigationAwareLoginDetector,
+            autoCompleteApi,
+            appSettingsPreferencesStore,
+            longPressHandler,
+            webViewSessionStorage,
+            specialUrlDetector,
+            faviconManager,
+            addToHomeCapabilityDetector,
+            ctaViewModel,
+            searchCountDao,
+            pixel,
+            dispatchers,
+            userEventsStore,
+            notificationDao,
+            useOurAppDetector,
+            variantManager,
+            fileDownloader,
+            globalPrivacyControl,
+            fireproofDialogsEventHandler
+        )
+    }
+}
+
+private class BrowserTabViewModelFactory(
+    private val statisticsUpdater: StatisticsUpdater,
+    private val queryUrlConverter: OmnibarEntryConverter,
+    private val duckDuckGoUrlDetector: DuckDuckGoUrlDetector,
+    private val siteFactory: SiteFactory,
+    private val tabRepository: TabRepository,
+    private val userWhitelistDao: UserWhitelistDao,
+    private val networkLeaderboardDao: NetworkLeaderboardDao,
+    private val bookmarksDao: BookmarksDao,
+    private val fireproofWebsiteRepository: FireproofWebsiteRepository,
+    private val locationPermissionsRepository: LocationPermissionsRepository,
+    private val geoLocationPermissions: GeoLocationPermissions,
+    private val navigationAwareLoginDetector: NavigationAwareLoginDetector,
+    private val autoComplete: AutoComplete,
+    private val appSettingsPreferencesStore: SettingsDataStore,
+    private val longPressHandler: LongPressHandler,
+    private val webViewSessionStorage: WebViewSessionStorage,
+    private val specialUrlDetector: SpecialUrlDetector,
+    private val faviconManager: FaviconManager,
+    private val addToHomeCapabilityDetector: AddToHomeCapabilityDetector,
+    private val ctaViewModel: CtaViewModel,
+    private val searchCountDao: SearchCountDao,
+    private val pixel: Pixel,
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+    private val userEventsStore: UserEventsStore,
+    private val notificationDao: NotificationDao,
+    private val useOurAppDetector: UseOurAppDetector,
+    private val variantManager: VariantManager,
+    private val fileDownloader: FileDownloader,
+    private val globalPrivacyControl: GlobalPrivacyControl,
+    private val fireproofDialogsEventHandler: FireproofDialogsEventHandler
+) : ViewModelFactoryPlugin {
+    override fun <T : ViewModel?> create(modelClass: Class<T>): T? {
+        with(modelClass) {
+            return when {
+                isAssignableFrom(BrowserTabViewModel::class.java) -> BrowserTabViewModel(statisticsUpdater, queryUrlConverter, duckDuckGoUrlDetector, siteFactory, tabRepository, userWhitelistDao, networkLeaderboardDao, bookmarksDao, fireproofWebsiteRepository, locationPermissionsRepository, geoLocationPermissions, navigationAwareLoginDetector, autoComplete, appSettingsPreferencesStore, longPressHandler, webViewSessionStorage, specialUrlDetector, faviconManager, addToHomeCapabilityDetector, ctaViewModel, searchCountDao, pixel, dispatchers, userEventsStore, notificationDao, useOurAppDetector, variantManager, fileDownloader, globalPrivacyControl, fireproofDialogsEventHandler) as T
+                else -> null
+            }
+        }
     }
 }

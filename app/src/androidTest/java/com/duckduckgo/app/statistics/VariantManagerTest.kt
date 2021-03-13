@@ -68,20 +68,6 @@ class VariantManagerTest {
     }
 
     @Test
-    fun roleManagerDefaultBrowserDialogControlHasExpectedWeightAndFeatures() {
-        val variant = variants.first { it.key == "zt" }
-        assertEqualsDouble(1.0, variant.weight)
-        assertTrue(variant.features.isEmpty())
-    }
-
-    @Test
-    fun roleManagerDefaultBrowserDialogTreatmentHasExpectedWeightAndFeatures() {
-        val variant = variants.first { it.key == "zu" }
-        assertEqualsDouble(1.0, variant.weight)
-        assertTrue(variant.features == listOf(SetDefaultBrowserDialog))
-    }
-
-    @Test
     fun verifyNoDuplicateVariantNames() {
         val existingNames = mutableSetOf<String>()
         variants.forEach {
@@ -89,6 +75,22 @@ class VariantManagerTest {
                 fail("Duplicate variant name found: ${it.key}")
             }
         }
+    }
+
+    // Fireproof Login experiment
+    @Test
+    fun fireproofLoginDetectionControlVariantHasExpectedWeightAndFeatures() {
+        val variant = variants.first { it.key == "zq" }
+        assertEqualsDouble(1.0, variant.weight)
+        assertEquals(0, variant.features.size)
+    }
+
+    @Test
+    fun fireproofLoginDetectionExperimentVariantHasExpectedWeightAndFeatures() {
+        val variant = variants.first { it.key == "zw" }
+        assertEqualsDouble(1.0, variant.weight)
+        assertEquals(1, variant.features.size)
+        assertEquals(LoginDetectionEnabled, variant.features[0])
     }
 
     @Suppress("SameParameterValue")

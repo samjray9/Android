@@ -46,8 +46,10 @@ import com.duckduckgo.app.browser.LongPressHandler.RequiredAction.OpenInNewTab
 import com.duckduckgo.app.browser.addtohome.AddToHomeCapabilityDetector
 import com.duckduckgo.app.browser.downloader.FileDownloader
 import com.duckduckgo.app.browser.favicon.FaviconManager
+import com.duckduckgo.app.browser.logindetection.FireproofDialogsEventHandler
 import com.duckduckgo.app.browser.logindetection.LoginDetected
 import com.duckduckgo.app.browser.logindetection.NavigationAwareLoginDetector
+import com.duckduckgo.app.browser.logindetection.NavigationEvent
 import com.duckduckgo.app.browser.logindetection.NavigationEvent.LoginAttempt
 import com.duckduckgo.app.browser.model.BasicAuthenticationCredentials
 import com.duckduckgo.app.browser.model.BasicAuthenticationRequest
@@ -71,6 +73,9 @@ import com.duckduckgo.app.global.model.SiteFactory
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector.Companion.USE_OUR_APP_DOMAIN
 import com.duckduckgo.app.global.useourapp.UseOurAppDetector.Companion.USE_OUR_APP_SHORTCUT_URL
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlManager
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlManager.Companion.GPC_HEADER
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlManager.Companion.GPC_HEADER_VALUE
 import com.duckduckgo.app.location.GeoLocationPermissions
 import com.duckduckgo.app.location.data.LocationPermissionEntity
 import com.duckduckgo.app.location.data.LocationPermissionType
@@ -108,7 +113,8 @@ import io.reactivex.Observable
 import io.reactivex.Single
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runBlockingTest
 import org.junit.After
@@ -120,6 +126,7 @@ import org.mockito.*
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.internal.util.DefaultMockingDetails
 import java.io.File
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -227,6 +234,9 @@ class BrowserTabViewModelTest {
     @Mock
     private lateinit var geoLocationPermissions: GeoLocationPermissions
 
+    @Mock
+    private lateinit var fireproofDialogsEventHandler: FireproofDialogsEventHandler
+
     private val lazyFaviconManager = Lazy { mockFaviconManager }
 
     private lateinit var mockAutoCompleteApi: AutoCompleteApi
@@ -248,11 +258,13 @@ class BrowserTabViewModelTest {
 
     private val loginEventLiveData = MutableLiveData<LoginDetected>()
 
+    private val fireproofDialogsEventHandlerLiveData = MutableLiveData<FireproofDialogsEventHandler.Event>()
+
     private val dismissedCtaDaoChannel = Channel<List<DismissedCta>>()
 
     @Before
     fun before() {
-        MockitoAnnotations.initMocks(this)
+        MockitoAnnotations.openMocks(this)
         db = Room.inMemoryDatabaseBuilder(getInstrumentation().targetContext, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -260,6 +272,7 @@ class BrowserTabViewModelTest {
         locationPermissionsDao = db.locationPermissionsDao()
 
         mockAutoCompleteApi = AutoCompleteApi(mockAutoCompleteService, mockBookmarksDao)
+        val fireproofWebsiteRepository = FireproofWebsiteRepository(fireproofWebsiteDao, coroutineRule.testDispatcherProvider, lazyFaviconManager)
 
         whenever(mockDismissedCtaDao.dismissedCtas()).thenReturn(dismissedCtaDaoChannel.consumeAsFlow())
         whenever(mockTabRepository.flowTabs).thenReturn(flowOf(emptyList()))
@@ -291,6 +304,7 @@ class BrowserTabViewModelTest {
         whenever(mockPrivacyPractices.privacyPracticesFor(any())).thenReturn(PrivacyPractices.UNKNOWN)
         whenever(mockAppInstallStore.installTimestamp).thenReturn(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))
         whenever(mockUserWhitelistDao.contains(anyString())).thenReturn(false)
+        whenever(fireproofDialogsEventHandler.event).thenReturn(fireproofDialogsEventHandlerLiveData)
 
         testee = BrowserTabViewModel(
             statisticsUpdater = mockStatisticsUpdater,
@@ -312,7 +326,7 @@ class BrowserTabViewModelTest {
             searchCountDao = mockSearchCountDao,
             pixel = mockPixel,
             dispatchers = coroutineRule.testDispatcherProvider,
-            fireproofWebsiteRepository = FireproofWebsiteRepository(fireproofWebsiteDao, coroutineRule.testDispatcherProvider, lazyFaviconManager),
+            fireproofWebsiteRepository = fireproofWebsiteRepository,
             locationPermissionsRepository = LocationPermissionsRepository(
                 locationPermissionsDao,
                 lazyFaviconManager,
@@ -324,7 +338,9 @@ class BrowserTabViewModelTest {
             notificationDao = mockNotificationDao,
             useOurAppDetector = UseOurAppDetector(mockUserEventsStore),
             variantManager = mockVariantManager,
-            fileDownloader = mockFileDownloader
+            fileDownloader = mockFileDownloader,
+            globalPrivacyControl = GlobalPrivacyControlManager(mockSettingsStore),
+            fireproofDialogsEventHandler = fireproofDialogsEventHandler
         )
 
         testee.loadData("abc", null, false)
@@ -632,6 +648,16 @@ class BrowserTabViewModelTest {
     }
 
     @Test
+    fun whenUserRedirectedThenNotifyLoginDetector() = coroutineRule.runBlocking {
+        loadUrl("http://duckduckgo.com")
+        testee.progressChanged(100)
+
+        overrideUrl("http://example.com")
+
+        verify(mockNavigationAwareLoginDetector).onEvent(NavigationEvent.Redirect("http://example.com"))
+    }
+
+    @Test
     fun whenLoadingProgressReaches50ThenShowWebContent() = coroutineRule.runBlocking {
         loadUrl("http://duckduckgo.com")
         testee.progressChanged(50)
@@ -806,9 +832,9 @@ class BrowserTabViewModelTest {
     }
 
     @Test
-    fun whenShowEmptyGradeIsTrueThenIsEnableIsFalse() {
+    fun whenShowEmptyGradeIsTrueThenIsEnableIsTrue() {
         val testee = BrowserTabViewModel.PrivacyGradeViewState(PrivacyGrade.A, shouldAnimate = false, showEmptyGrade = true)
-        assertFalse(testee.isEnabled)
+        assertTrue(testee.isEnabled)
     }
 
     @Test
@@ -948,7 +974,7 @@ class BrowserTabViewModelTest {
 
     @Test
     fun whenEnteringQueryWithAutoCompleteEnabledThenAutoCompleteSuggestionsShown() {
-        whenever(mockBookmarksDao.bookmarksByQuery("%foo%")).thenReturn(Single.just(emptyList()))
+        whenever(mockBookmarksDao.bookmarksObservable()).thenReturn(Single.just(emptyList()))
         whenever(mockAutoCompleteService.autoComplete("foo")).thenReturn(Observable.just(emptyList()))
         doReturn(true).whenever(mockSettingsStore).autoCompleteSuggestionsEnabled
         testee.onOmnibarInputStateChanged("foo", true, hasQueryChanged = true)
@@ -1199,6 +1225,57 @@ class BrowserTabViewModelTest {
     fun whenRefreshRequestedWithBrowserGlobalLayoutThenRefresh() {
         testee.onRefreshRequested()
         assertCommandIssued<Command.Refresh>()
+    }
+
+    @Test
+    fun whenRefreshRequestedWithQuerySearchThenFireQueryChangePixelZero() {
+        loadUrl("query")
+
+        testee.onRefreshRequested()
+
+        verify(mockPixel).fire("rq_0")
+    }
+
+    @Test
+    fun whenRefreshRequestedWithUrlThenDoNotFireQueryChangePixel() {
+        loadUrl("https://example.com")
+
+        testee.onRefreshRequested()
+
+        verify(mockPixel, never()).fire("rq_0")
+    }
+
+    @Test
+    fun whenUserSubmittedQueryWithPreviousBlankQueryThenDoNotSendQueryChangePixel() {
+        whenever(mockOmnibarConverter.convertQueryToUrl("another query", null)).thenReturn("another query")
+        loadUrl("")
+
+        testee.onUserSubmittedQuery("another query")
+
+        verify(mockPixel, never()).fire("rq_0")
+        verify(mockPixel, never()).fire("rq_1")
+    }
+
+    @Test
+    fun whenUserSubmittedQueryWithDifferentPreviousQueryThenSendQueryChangePixel() {
+        whenever(mockOmnibarConverter.convertQueryToUrl("another query", null)).thenReturn("another query")
+        loadUrl("query")
+
+        testee.onUserSubmittedQuery("another query")
+
+        verify(mockPixel, never()).fire("rq_0")
+        verify(mockPixel).fire("rq_1")
+    }
+
+    @Test
+    fun whenUserSubmittedDifferentQueryAndOldQueryIsUrlThenDoNotSendQueryChangePixel() {
+        whenever(mockOmnibarConverter.convertQueryToUrl("another query", null)).thenReturn("another query")
+        loadUrl("www.foo.com")
+
+        testee.onUserSubmittedQuery("another query")
+
+        verify(mockPixel, never()).fire("rq_0")
+        verify(mockPixel, never()).fire("rq_1")
     }
 
     @Test
@@ -2025,24 +2102,28 @@ class BrowserTabViewModelTest {
     }
 
     @Test
-    fun whenUserFireproofsWebsiteFromLoginDialogThenShowConfirmationIsIssuedWithExpectedDomain() {
-        loadUrl("http://mobile.example.com/", isBrowserShowing = true)
+    fun whenUserFireproofsWebsiteFromLoginDialogThenShowConfirmationIsIssuedWithExpectedDomain() = coroutineRule.runBlocking {
+        whenever(fireproofDialogsEventHandler.onUserConfirmedFireproofDialog(anyString())).doAnswer {
+            val domain = it.arguments.first() as String
+            fireproofDialogsEventHandlerLiveData.postValue(FireproofDialogsEventHandler.Event.FireproofWebSiteSuccess(FireproofWebsiteEntity(domain)))
+        }
+
         testee.onUserConfirmedFireproofDialog("login.example.com")
+
         assertCommandIssued<Command.ShowFireproofWebSiteConfirmation> {
             assertEquals("login.example.com", this.fireproofWebsiteEntity.domain)
         }
     }
 
     @Test
-    fun whenUserFireproofsWebsiteFromLoginDialogThenPixelSent() {
-        testee.onUserConfirmedFireproofDialog("login.example.com")
-        verify(mockPixel).fire(Pixel.PixelName.FIREPROOF_WEBSITE_LOGIN_ADDED)
-    }
+    fun whenAskToDisableLoginDetectionEventReceivedThenAskUserToDisableLoginDetection() = coroutineRule.runBlocking {
+        whenever(fireproofDialogsEventHandler.onUserDismissedFireproofLoginDialog()).doAnswer {
+            fireproofDialogsEventHandlerLiveData.postValue(FireproofDialogsEventHandler.Event.AskToDisableLoginDetection)
+        }
 
-    @Test
-    fun whenUserDismissesFireproofWebsiteLoginDialogThenPixelSent() {
         testee.onUserDismissedFireproofLoginDialog()
-        verify(mockPixel).fire(Pixel.PixelName.FIREPROOF_WEBSITE_LOGIN_DISMISS)
+
+        assertCommandIssued<Command.AskToDisableLoginDetection>()
     }
 
     @Test
@@ -2455,12 +2536,12 @@ class BrowserTabViewModelTest {
         givenDeviceLocationSharingIsEnabled(true)
         givenLocationPermissionIsEnabled(true)
         givenCurrentSite(domain)
-
+        givenNewPermissionRequestFromDomain(domain)
         testee.onSiteLocationPermissionSelected(domain, LocationPermissionType.ALLOW_ONCE)
 
         givenNewPermissionRequestFromDomain(domain)
 
-        assertCommandNotIssued<Command.CheckSystemLocationPermission>()
+        assertCommandIssuedTimes<Command.CheckSystemLocationPermission>(times = 1)
     }
 
     @Test
@@ -2699,11 +2780,7 @@ class BrowserTabViewModelTest {
         givenLocationPermissionIsEnabled(true)
 
         loadUrl("https://www.example.com", isBrowserShowing = true)
-
-        assertCommandIssued<Command.ShowDomainHasPermissionMessage>()
-
         loadUrl("https://www.example.com", isBrowserShowing = true)
-
         assertCommandIssuedTimes<Command.ShowDomainHasPermissionMessage>(1)
     }
 
@@ -2940,7 +3017,7 @@ class BrowserTabViewModelTest {
         verify(mockCommandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
 
         val command = commandCaptor.lastValue as Navigate
-        assertEquals(BrowserTabViewModel.GPC_HEADER_VALUE, command.headers[BrowserTabViewModel.GPC_HEADER])
+        assertEquals(GPC_HEADER_VALUE, command.headers[GPC_HEADER])
     }
 
     @Test
@@ -2964,7 +3041,7 @@ class BrowserTabViewModelTest {
         verify(mockCommandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
 
         val command = commandCaptor.lastValue as Navigate
-        assertEquals(BrowserTabViewModel.GPC_HEADER_VALUE, command.headers[BrowserTabViewModel.GPC_HEADER])
+        assertEquals(GPC_HEADER_VALUE, command.headers[GPC_HEADER])
     }
 
     @Test
@@ -2988,7 +3065,7 @@ class BrowserTabViewModelTest {
         verify(mockCommandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
 
         val command = commandCaptor.lastValue as Command.HandleExternalAppLink
-        assertEquals(BrowserTabViewModel.GPC_HEADER_VALUE, command.headers[BrowserTabViewModel.GPC_HEADER])
+        assertEquals(GPC_HEADER_VALUE, command.headers[GPC_HEADER])
     }
 
     @Test
@@ -3014,6 +3091,48 @@ class BrowserTabViewModelTest {
         advanceTimeBy(3_600_000)
         verify(mockDismissedCtaDao).insert(DismissedCta(CtaId.DAX_FIRE_BUTTON))
         verify(mockDismissedCtaDao).insert(DismissedCta(CtaId.DAX_FIRE_BUTTON_PULSE))
+    }
+
+    @Test
+    fun whenRedirectTriggeredByGpcThenGpcRedirectEventSent() {
+        testee.redirectTriggeredByGpc()
+        verify(mockNavigationAwareLoginDetector).onEvent(NavigationEvent.GpcRedirect)
+    }
+
+    @Test
+    fun whenProgressIs100ThenRefreshUserAgentCommandSent() {
+        loadUrl("http://duckduckgo.com")
+        testee.progressChanged(100)
+
+        assertCommandIssued<Command.RefreshUserAgent>()
+    }
+
+    @Test
+    fun whenRequestFileDownloadAndUrlIsBlobThenConvertBlobToDataUriCommandSent() {
+        val blobUrl = "blob:https://example.com/283nasdho23jkasdAjd"
+        val mime = "application/plain"
+
+        testee.requestFileDownload(blobUrl, null, mime, true)
+
+        assertCommandIssued<Command.ConvertBlobToDataUri> {
+            assertEquals(blobUrl, url)
+            assertEquals(mime, mimeType)
+        }
+    }
+
+    @Test
+    fun whenRequestFileDownloadAndUrlIsNotBlobThenRquestFileDownloadCommandSent() {
+        val normalUrl = "https://example.com/283nasdho23jkasdAjd"
+        val mime = "application/plain"
+
+        testee.requestFileDownload(normalUrl, null, mime, true)
+
+        assertCommandIssued<Command.RequestFileDownload> {
+            assertEquals(normalUrl, url)
+            assertEquals(mime, mimeType)
+            assertNull(contentDisposition)
+            assertTrue(requestUserConfirmation)
+        }
     }
 
     private suspend fun givenFireButtonPulsing() {
@@ -3051,13 +3170,22 @@ class BrowserTabViewModelTest {
     }
 
     private inline fun <reified T : Command> assertCommandNotIssued() {
-        val issuedCommand = commandCaptor.allValues.find { it is T }
-        assertNull(issuedCommand)
+        val defaultMockingDetails = DefaultMockingDetails(mockCommandObserver)
+        if (defaultMockingDetails.invocations.isNotEmpty()) {
+            verify(mockCommandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
+            val issuedCommand = commandCaptor.allValues.find { it is T }
+            assertNull(issuedCommand)
+        }
     }
 
     private inline fun <reified T : Command> assertCommandIssuedTimes(times: Int) {
-        val timesIssued = commandCaptor.allValues.count { it is T }
-        assertEquals(times, timesIssued)
+        if (times == 0) {
+            assertCommandNotIssued<T>()
+        } else {
+            verify(mockCommandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
+            val timesIssued = commandCaptor.allValues.count { it is T }
+            assertEquals(times, timesIssued)
+        }
     }
 
     private fun pixelParams(showedBookmarks: Boolean, bookmarkCapable: Boolean) = mapOf(

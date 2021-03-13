@@ -37,8 +37,6 @@ import com.duckduckgo.app.trackerdetection.model.Entity
 import kotlinx.android.synthetic.main.include_cta_buttons.view.*
 import kotlinx.android.synthetic.main.include_cta_content.view.*
 import kotlinx.android.synthetic.main.include_dax_dialog_cta.view.*
-import kotlinx.android.synthetic.main.include_top_cta.view.*
-import java.util.*
 
 interface DialogCta {
     fun createCta(activity: FragmentActivity): DaxDialog
@@ -132,7 +130,7 @@ sealed class DaxDialogCta(
 ) : Cta, DialogCta, DaxCta {
 
     override fun createCta(activity: FragmentActivity): DaxDialog =
-        TypewriterDaxDialog.newInstance(getDaxText(activity), activity.resources.getString(okButton))
+        TypewriterDaxDialog.newInstance(daxText = getDaxText(activity), primaryButtonText = activity.resources.getString(okButton))
 
     override fun pixelCancelParameters(): Map<String, String> = mapOf(Pixel.PixelParameter.CTA_SHOWN to ctaPixelParam)
 
@@ -255,7 +253,6 @@ sealed class DaxDialogCta(
         private const val MAX_TRACKERS_SHOWS = 2
         const val SERP = "duckduckgo"
         private val mainTrackerDomains = listOf("facebook", "google")
-        private val networkPropertyPercentages = mapOf(Pair("Google", "90%"), Pair("Facebook", "40%"))
         val mainTrackerNetworks = listOf("Facebook", "Google")
     }
 }
@@ -409,26 +406,6 @@ sealed class HomePanelCta(
         Pixel.PixelName.WIDGET_LEGACY_CTA_LAUNCHED,
         Pixel.PixelName.WIDGET_LEGACY_CTA_DISMISSED
     )
-}
-
-sealed class HomeTopPanelCta(
-    override val ctaId: CtaId,
-    override val shownPixel: Pixel.PixelName?,
-    override val okPixel: Pixel.PixelName?,
-    override val cancelPixel: Pixel.PixelName?,
-    @StringRes open val description: Int
-) : Cta, ViewCta {
-
-    override fun pixelCancelParameters(): Map<String, String> = emptyMap()
-
-    override fun pixelOkParameters(): Map<String, String> = emptyMap()
-
-    override fun pixelShownParameters(): Map<String, String> = emptyMap()
-
-    override fun showCta(view: View) {
-        view.upperCtaTitle.text = view.context.getString(description)
-        view.show()
-    }
 }
 
 fun DaxCta.addCtaToHistory(newCta: String): String {

@@ -27,19 +27,21 @@ import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
 import com.duckduckgo.app.browser.certificates.rootstore.CertificateValidationState
 import com.duckduckgo.app.browser.certificates.rootstore.TrustedCertificateStore
-import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlInjector
+import com.duckduckgo.app.browser.httpauth.WebViewHttpAuthStore
 import com.duckduckgo.app.browser.logindetection.DOMLoginDetector
 import com.duckduckgo.app.browser.logindetection.WebNavigationEvent
 import com.duckduckgo.app.browser.model.BasicAuthenticationRequest
 import com.duckduckgo.app.browser.navigation.safeCopyBackForwardList
 import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
 import com.duckduckgo.app.global.exception.UncaughtExceptionSource.*
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
 import com.duckduckgo.app.statistics.store.OfflinePixelCountDataStore
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.net.URI
 
 class BrowserWebViewClient(
+    private val webViewHttpAuthStore: WebViewHttpAuthStore,
     private val trustedCertificateStore: TrustedCertificateStore,
     private val requestRewriter: RequestRewriter,
     private val specialUrlDetector: SpecialUrlDetector,
@@ -49,7 +51,7 @@ class BrowserWebViewClient(
     private val cookieManager: CookieManager,
     private val loginDetector: DOMLoginDetector,
     private val dosDetector: DosDetector,
-    private val globalPrivacyControlInjector: GlobalPrivacyControlInjector
+    private val globalPrivacyControl: GlobalPrivacyControl
 ) : WebViewClient() {
 
     var webViewClientListener: WebViewClientListener? = null
@@ -144,7 +146,7 @@ class BrowserWebViewClient(
                 webViewClientListener?.pageRefreshed(url)
             }
             lastPageStarted = url
-            globalPrivacyControlInjector.injectDoNotSellToDom(webView)
+            globalPrivacyControl.injectDoNotSellToDom(webView)
             loginDetector.onEvent(WebNavigationEvent.OnPageStarted(webView))
         } catch (e: Throwable) {
             GlobalScope.launch {
@@ -215,15 +217,17 @@ class BrowserWebViewClient(
             if (handler != null) {
                 Timber.v("onReceivedHttpAuthRequest - useHttpAuthUsernamePassword [${handler.useHttpAuthUsernamePassword()}]")
                 if (handler.useHttpAuthUsernamePassword()) {
-                    val credentials = buildAuthenticationCredentials(host.orEmpty(), realm.orEmpty(), view)
+                    val credentials = view?.let {
+                        webViewHttpAuthStore.getHttpAuthUsernamePassword(it, host.orEmpty(), realm.orEmpty())
+                    }
 
                     if (credentials != null) {
-                        handler.proceed(credentials[0], credentials[1])
+                        handler.proceed(credentials.username, credentials.password)
                     } else {
-                        showAuthenticationDialog(view, handler, host, realm)
+                        requestAuthentication(view, handler, host, realm)
                     }
                 } else {
-                    showAuthenticationDialog(view, handler, host, realm)
+                    requestAuthentication(view, handler, host, realm)
                 }
             } else {
                 super.onReceivedHttpAuthRequest(view, handler, host, realm)
@@ -250,22 +254,7 @@ class BrowserWebViewClient(
         if (trusted is CertificateValidationState.TrustedChain) handler.proceed() else super.onReceivedSslError(view, handler, error)
     }
 
-    private fun buildAuthenticationCredentials(
-        host: String,
-        realm: String,
-        view: WebView?
-    ): Array<out String>? {
-        val webViewDatabase = WebViewDatabase.getInstance(view?.context)
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            webViewDatabase.getHttpAuthUsernamePassword(host, realm)
-        } else {
-            @Suppress("DEPRECATION")
-            view?.getHttpAuthUsernamePassword(host, realm)
-        }
-    }
-
-    private fun showAuthenticationDialog(
+    private fun requestAuthentication(
         view: WebView?,
         handler: HttpAuthHandler,
         host: String?,

@@ -16,11 +16,15 @@
 
 package com.duckduckgo.app.browser
 
+import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.annotation.WorkerThread
+import com.duckduckgo.app.browser.useragent.UserAgentProvider
 import com.duckduckgo.app.global.isHttp
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
+import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlManager
 import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
 import com.duckduckgo.app.privacy.db.PrivacyProtectionCountDao
 import com.duckduckgo.app.privacy.model.TrustedSites
@@ -45,8 +49,9 @@ class WebViewRequestInterceptor(
     private val resourceSurrogates: ResourceSurrogates,
     private val trackerDetector: TrackerDetector,
     private val httpsUpgrader: HttpsUpgrader,
-    private val privacyProtectionCountDao: PrivacyProtectionCountDao
-
+    private val privacyProtectionCountDao: PrivacyProtectionCountDao,
+    private val globalPrivacyControl: GlobalPrivacyControl,
+    private val userAgentProvider: UserAgentProvider
 ) : RequestInterceptor {
 
     /**
@@ -68,15 +73,31 @@ class WebViewRequestInterceptor(
 
         val url = request.url
 
+        newUserAgent(request, webView, webViewClientListener)?.let {
+            withContext(Dispatchers.Main) {
+                webView.settings?.userAgentString = it
+                webView.loadUrl(url.toString(), getHeaders(request))
+            }
+            return WebResourceResponse(null, null, null)
+        }
+
         if (shouldUpgrade(request)) {
             val newUri = httpsUpgrader.upgrade(url)
 
             withContext(Dispatchers.Main) {
-                webView.loadUrl(newUri.toString())
+                webView.loadUrl(newUri.toString(), getHeaders(request))
             }
 
             webViewClientListener?.upgradedToHttps()
             privacyProtectionCountDao.incrementUpgradeCount()
+            return WebResourceResponse(null, null, null)
+        }
+
+        if (shouldAddGcpHeaders(request) && !requestWasInTheStack(url, webView)) {
+            withContext(Dispatchers.Main) {
+                webViewClientListener?.redirectTriggeredByGpc()
+                webView.loadUrl(url.toString(), getHeaders(request))
+            }
             return WebResourceResponse(null, null, null)
         }
 
@@ -106,6 +127,51 @@ class WebViewRequestInterceptor(
         return null
     }
 
+    private fun getHeaders(request: WebResourceRequest): Map<String, String> {
+        return request.requestHeaders.apply {
+            putAll(globalPrivacyControl.getHeaders())
+        }
+    }
+
+    private fun shouldAddGcpHeaders(request: WebResourceRequest): Boolean {
+        val headers = request.requestHeaders
+        return (
+            globalPrivacyControl.isGpcActive() &&
+                !headers.containsKey(GlobalPrivacyControlManager.GPC_HEADER) &&
+                request.isForMainFrame &&
+                request.method == "GET" &&
+                globalPrivacyControl.shouldAddHeaders(request.url)
+            )
+    }
+
+    private suspend fun requestWasInTheStack(url: Uri, webView: WebView): Boolean {
+        return withContext(Dispatchers.Main) {
+            val webBackForwardList = webView.copyBackForwardList()
+            webBackForwardList.currentItem?.url == url.toString()
+        }
+    }
+
+    private suspend fun newUserAgent(
+        request: WebResourceRequest,
+        webView: WebView,
+        webViewClientListener: WebViewClientListener?
+    ): String? {
+        return if (request.isForMainFrame && request.method == "GET") {
+            val url = request.url ?: return null
+            if (requestWasInTheStack(url, webView)) return null
+            val desktopSiteEnabled = webViewClientListener?.isDesktopSiteEnabled() == true
+            val currentAgent = withContext(Dispatchers.Main) { webView.settings?.userAgentString }
+            val newAgent = userAgentProvider.userAgent(url.toString(), desktopSiteEnabled)
+            return if (currentAgent != newAgent) {
+                newAgent
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
     private fun shouldUpgrade(request: WebResourceRequest) =
         request.isForMainFrame && request.url != null && httpsUpgrader.shouldUpgrade(request.url)
 
@@ -120,5 +186,4 @@ class WebViewRequestInterceptor(
         webViewClientListener?.trackerDetected(trackingEvent)
         return trackingEvent.blocked
     }
-
 }

@@ -28,9 +28,16 @@ import com.duckduckgo.app.bookmarks.ui.EditBookmarkDialogFragment.EditBookmarkLi
 import com.duckduckgo.app.browser.favicon.FaviconManager
 import com.duckduckgo.app.global.DispatcherProvider
 import com.duckduckgo.app.global.SingleLiveEvent
+import com.duckduckgo.app.global.plugins.view_model.ViewModelFactoryPlugin
+import com.duckduckgo.di.scopes.AppObjectGraph
+import com.squareup.anvil.annotations.ContributesTo
+import dagger.Module
+import dagger.Provides
+import dagger.multibindings.IntoSet
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import javax.inject.Singleton
 
 class BookmarksViewModel(
     val dao: BookmarksDao,
@@ -105,4 +112,40 @@ class BookmarksViewModel(
         }
     }
 
+    fun insert(bookmark: BookmarkEntity) {
+        viewModelScope.launch(dispatcherProvider.io()) {
+            dao.insert(BookmarkEntity(title = bookmark.title, url = bookmark.url))
+        }
+    }
+
+}
+
+@Module
+@ContributesTo(AppObjectGraph::class)
+class BookmarksViewModelFactoryModule {
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideBookmarksViewModelFactory(
+        dao: BookmarksDao,
+        faviconManager: FaviconManager,
+        dispatcherProvider: DispatcherProvider
+    ): ViewModelFactoryPlugin {
+        return BookmarksViewModelFactory(dao, faviconManager, dispatcherProvider)
+    }
+}
+
+private class BookmarksViewModelFactory(
+    private val dao: BookmarksDao,
+    private val faviconManager: FaviconManager,
+    private val dispatcherProvider: DispatcherProvider
+) : ViewModelFactoryPlugin {
+    override fun <T : ViewModel?> create(modelClass: Class<T>): T? {
+        with(modelClass) {
+            return when {
+                isAssignableFrom(BookmarksViewModel::class.java) -> (BookmarksViewModel(dao, faviconManager, dispatcherProvider) as T)
+                else -> null
+            }
+        }
+    }
 }
