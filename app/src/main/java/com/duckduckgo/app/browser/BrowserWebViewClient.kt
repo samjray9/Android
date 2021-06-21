@@ -25,13 +25,17 @@ import android.webkit.*
 import androidx.annotation.RequiresApi
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
+import androidx.core.net.toUri
 import com.duckduckgo.app.browser.certificates.rootstore.CertificateValidationState
 import com.duckduckgo.app.browser.certificates.rootstore.TrustedCertificateStore
+import com.duckduckgo.app.browser.cookies.ThirdPartyCookieManager
 import com.duckduckgo.app.browser.httpauth.WebViewHttpAuthStore
 import com.duckduckgo.app.browser.logindetection.DOMLoginDetector
 import com.duckduckgo.app.browser.logindetection.WebNavigationEvent
 import com.duckduckgo.app.browser.model.BasicAuthenticationRequest
 import com.duckduckgo.app.browser.navigation.safeCopyBackForwardList
+import com.duckduckgo.app.email.EmailInjector
+import com.duckduckgo.app.global.DispatcherProvider
 import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
 import com.duckduckgo.app.global.exception.UncaughtExceptionSource.*
 import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
@@ -51,7 +55,11 @@ class BrowserWebViewClient(
     private val cookieManager: CookieManager,
     private val loginDetector: DOMLoginDetector,
     private val dosDetector: DosDetector,
-    private val globalPrivacyControl: GlobalPrivacyControl
+    private val globalPrivacyControl: GlobalPrivacyControl,
+    private val thirdPartyCookieManager: ThirdPartyCookieManager,
+    private val appCoroutineScope: CoroutineScope,
+    private val dispatcherProvider: DispatcherProvider,
+    private val emailInjector: EmailInjector
 ) : WebViewClient() {
 
     var webViewClientListener: WebViewClientListener? = null
@@ -60,9 +68,10 @@ class BrowserWebViewClient(
     /**
      * This is the new method of url overriding available from API 24 onwards
      */
+    @RequiresApi(Build.VERSION_CODES.N)
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url
-        return shouldOverride(view, url, request.isForMainFrame)
+        return shouldOverride(view, url, request.isForMainFrame, request.isRedirect)
     }
 
     /**
@@ -71,13 +80,13 @@ class BrowserWebViewClient(
     @Suppress("OverridingDeprecatedMember")
     override fun shouldOverrideUrlLoading(view: WebView, urlString: String): Boolean {
         val url = Uri.parse(urlString)
-        return shouldOverride(view, url, true)
+        return shouldOverride(view, url, isForMainFrame = true, isRedirect = false)
     }
 
     /**
      * API-agnostic implementation of deciding whether to override url or not
      */
-    private fun shouldOverride(webView: WebView, url: Uri, isForMainFrame: Boolean): Boolean {
+    private fun shouldOverride(webView: WebView, url: Uri, isForMainFrame: Boolean, isRedirect: Boolean): Boolean {
 
         Timber.v("shouldOverride $url")
         try {
@@ -100,14 +109,25 @@ class BrowserWebViewClient(
                     webViewClientListener?.sendSmsRequested(urlType.telephoneNumber)
                     true
                 }
-                is SpecialUrlDetector.UrlType.IntentType -> {
-                    Timber.i("Found intent type link for $urlType.url")
-                    launchExternalApp(urlType)
+                is SpecialUrlDetector.UrlType.AppLink -> {
+                    Timber.i("Found app link for ${urlType.uriString}")
+                    webViewClientListener?.let { listener ->
+                        return listener.handleAppLink(urlType, isRedirect, isForMainFrame)
+                    }
+                    false
+                }
+                is SpecialUrlDetector.UrlType.NonHttpAppLink -> {
+                    Timber.i("Found non-http app link for ${urlType.uriString}")
+                    webViewClientListener?.let { listener ->
+                        return listener.handleNonHttpAppLink(urlType, isRedirect)
+                    }
                     true
                 }
                 is SpecialUrlDetector.UrlType.Unknown -> {
-                    Timber.w("Unable to process link type for ${urlType.url}")
-                    webView.loadUrl(webView.originalUrl)
+                    Timber.w("Unable to process link type for ${urlType.uriString}")
+                    webView.originalUrl?.let {
+                        webView.loadUrl(it)
+                    }
                     false
                 }
                 is SpecialUrlDetector.UrlType.SearchQuery -> false
@@ -124,7 +144,7 @@ class BrowserWebViewClient(
                 }
             }
         } catch (e: Throwable) {
-            GlobalScope.launch {
+            appCoroutineScope.launch {
                 uncaughtExceptionRepository.recordUncaughtException(e, SHOULD_OVERRIDE_REQUEST)
                 throw e
             }
@@ -132,24 +152,27 @@ class BrowserWebViewClient(
         }
     }
 
-    private fun launchExternalApp(urlType: SpecialUrlDetector.UrlType.IntentType) {
-        webViewClientListener?.externalAppLinkClicked(urlType)
-    }
-
     @UiThread
     override fun onPageStarted(webView: WebView, url: String?, favicon: Bitmap?) {
         try {
             Timber.v("onPageStarted webViewUrl: ${webView.url} URL: $url")
+            url?.let {
+                appCoroutineScope.launch(dispatcherProvider.default()) {
+                    thirdPartyCookieManager.processUriForThirdPartyCookies(webView, url.toUri())
+                }
+            }
             val navigationList = webView.safeCopyBackForwardList() ?: return
             webViewClientListener?.navigationStateChanged(WebViewNavigationState(navigationList))
             if (url != null && url == lastPageStarted) {
                 webViewClientListener?.pageRefreshed(url)
             }
             lastPageStarted = url
+            emailInjector.resetInjectedJsFlag()
             globalPrivacyControl.injectDoNotSellToDom(webView)
             loginDetector.onEvent(WebNavigationEvent.OnPageStarted(webView))
+            webViewClientListener?.resetAppLinkState()
         } catch (e: Throwable) {
-            GlobalScope.launch {
+            appCoroutineScope.launch {
                 uncaughtExceptionRepository.recordUncaughtException(e, ON_PAGE_STARTED)
                 throw e
             }
@@ -161,13 +184,14 @@ class BrowserWebViewClient(
         try {
             Timber.v("onPageFinished webViewUrl: ${webView.url} URL: $url")
             val navigationList = webView.safeCopyBackForwardList() ?: return
+            emailInjector.injectEmailAutofillJs(webView, url) // Needs to be injected onPageFinished
             webViewClientListener?.run {
                 navigationStateChanged(WebViewNavigationState(navigationList))
                 url?.let { prefetchFavicon(url) }
             }
             flushCookies()
         } catch (e: Throwable) {
-            GlobalScope.launch {
+            appCoroutineScope.launch {
                 uncaughtExceptionRepository.recordUncaughtException(e, ON_PAGE_FINISHED)
                 throw e
             }
@@ -175,7 +199,7 @@ class BrowserWebViewClient(
     }
 
     private fun flushCookies() {
-        GlobalScope.launch(Dispatchers.IO) {
+        appCoroutineScope.launch(dispatcherProvider.io()) {
             cookieManager.flush()
         }
     }
@@ -233,7 +257,7 @@ class BrowserWebViewClient(
                 super.onReceivedHttpAuthRequest(view, handler, host, realm)
             }
         } catch (e: Throwable) {
-            GlobalScope.launch {
+            appCoroutineScope.launch {
                 uncaughtExceptionRepository.recordUncaughtException(e, ON_HTTP_AUTH_REQUEST)
                 throw e
             }

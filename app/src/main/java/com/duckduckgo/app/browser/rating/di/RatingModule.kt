@@ -17,9 +17,11 @@
 package com.duckduckgo.app.browser.rating.di
 
 import android.content.Context
+import androidx.lifecycle.LifecycleObserver
 import com.duckduckgo.app.browser.rating.db.AppEnjoymentDao
 import com.duckduckgo.app.browser.rating.db.AppEnjoymentDatabaseRepository
 import com.duckduckgo.app.browser.rating.db.AppEnjoymentRepository
+import com.duckduckgo.app.di.AppCoroutineScope
 import com.duckduckgo.app.global.db.AppDatabase
 import com.duckduckgo.app.global.rating.*
 import com.duckduckgo.app.playstore.PlayStoreAndroidUtils
@@ -28,6 +30,8 @@ import com.duckduckgo.app.usage.app.AppDaysUsedRepository
 import com.duckduckgo.app.usage.search.SearchCountDao
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.IntoSet
+import kotlinx.coroutines.CoroutineScope
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -36,11 +40,13 @@ class RatingModule {
 
     @Singleton
     @Provides
-    fun appEnjoymentManager(
+    @IntoSet
+    fun appEnjoymentManagerObserver(
         appEnjoymentPromptEmitter: AppEnjoymentPromptEmitter,
-        promptTypeDecider: PromptTypeDecider
-    ): AppEnjoymentLifecycleObserver {
-        return AppEnjoymentAppCreationObserver(appEnjoymentPromptEmitter, promptTypeDecider)
+        promptTypeDecider: PromptTypeDecider,
+        @AppCoroutineScope appCoroutineScope: CoroutineScope
+    ): LifecycleObserver {
+        return AppEnjoymentAppCreationObserver(appEnjoymentPromptEmitter, promptTypeDecider, appCoroutineScope)
     }
 
     @Provides

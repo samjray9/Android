@@ -30,25 +30,24 @@ import com.duckduckgo.app.browser.tabpreview.WebViewPreviewPersister
 import com.duckduckgo.app.global.db.AppDatabase
 import com.duckduckgo.app.global.events.db.UserEventsStore
 import com.duckduckgo.app.global.model.SiteFactory
-import com.duckduckgo.app.global.useourapp.UseOurAppDetector
-import com.duckduckgo.app.global.useourapp.UseOurAppDetector.Companion.USE_OUR_APP_DOMAIN
 import com.duckduckgo.app.privacy.model.PrivacyPractices
 import com.duckduckgo.app.tabs.db.TabsDao
 import com.duckduckgo.app.trackerdetection.EntityLookup
 import com.nhaarman.mockitokotlin2.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestCoroutineScope
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+@ExperimentalCoroutinesApi
 class TabDataRepositoryTest {
 
     @get:Rule
@@ -72,8 +71,6 @@ class TabDataRepositoryTest {
     private val mockWebViewPreviewPersister: WebViewPreviewPersister = mock()
 
     private val mockUserEventsStore: UserEventsStore = mock()
-
-    private val useOurAppDetector = UseOurAppDetector(mockUserEventsStore)
 
     private lateinit var testee: TabDataRepository
 
@@ -278,33 +275,6 @@ class TabDataRepositoryTest {
     }
 
     @Test
-    fun whenSelectByUrlOrNewTabIfUrlAlreadyExistedInATabAndMatchesTheUseOurAppDomainThenSelectTheTab() = runBlocking<Unit> {
-        val db = createDatabase()
-        val dao = db.tabsDao()
-        dao.insertTab(TabEntity(tabId = "id", url = "http://www.$USE_OUR_APP_DOMAIN/test", skipHome = false, viewed = true, position = 0))
-        testee = tabDataRepository(dao)
-
-        testee.selectByUrlOrNewTab("http://m.$USE_OUR_APP_DOMAIN")
-
-        val value = testee.liveSelectedTab.blockingObserve()?.tabId
-        assertEquals("id", value)
-        db.close()
-    }
-
-    @Test
-    fun whenSelectByUrlOrNewTabIfUrlNotExistedInATabAndUrlMatchesUseOurAppDomainThenAddNewTabWithCorrectUrl() = runBlocking<Unit> {
-        val db = createDatabase()
-        val dao = db.tabsDao()
-        testee = tabDataRepository(dao)
-
-        testee.selectByUrlOrNewTab("http://m.$USE_OUR_APP_DOMAIN")
-
-        val value = testee.liveSelectedTab.blockingObserve()?.url
-        assertEquals("http://m.$USE_OUR_APP_DOMAIN", value)
-        db.close()
-    }
-
-    @Test
     fun whenAddFromSourceTabEnsureTabEntryContainsExpectedSourceId() = runBlocking<Unit> {
         val db = createDatabase()
         val dao = db.tabsDao()
@@ -320,7 +290,7 @@ class TabDataRepositoryTest {
     }
 
     @Test
-    fun whenDeleteCurrentTabAndSelectSourceLiveSelectedTabReturnsToSourceTab() = runBlocking<Unit> {
+    fun whenDeleteTabAndSelectSourceLiveSelectedTabReturnsToSourceTab() = runBlocking<Unit> {
         val db = createDatabase()
         val dao = db.tabsDao()
         val sourceTab = TabEntity(tabId = "sourceId", url = "http://www.example.com", position = 0)
@@ -331,7 +301,7 @@ class TabDataRepositoryTest {
         var currentSelectedTabId = testee.liveSelectedTab.blockingObserve()?.tabId
         assertEquals(currentSelectedTabId, tabToDelete.tabId)
 
-        testee.deleteCurrentTabAndSelectSource()
+        testee.deleteTabAndSelectSource("tabToDeleteId")
 
         currentSelectedTabId = testee.liveSelectedTab.blockingObserve()?.tabId
         assertEquals(currentSelectedTabId, sourceTab.tabId)
@@ -423,14 +393,34 @@ class TabDataRepositoryTest {
         job.cancel()
     }
 
+    @Test
+    fun whenDeleteTabAndSelectSourceIfTabHadAParentThenEmitParentTabId() = runBlocking {
+        val db = createDatabase()
+        val dao = db.tabsDao()
+        val sourceTab = TabEntity(tabId = "sourceId", url = "http://www.example.com", position = 0)
+        val tabToDelete = TabEntity(tabId = "tabToDeleteId", url = "http://www.example.com", position = 1, sourceTabId = "sourceId")
+        dao.addAndSelectTab(sourceTab)
+        dao.addAndSelectTab(tabToDelete)
+        testee = tabDataRepository(dao)
+
+        testee.deleteTabAndSelectSource("tabToDeleteId")
+
+        val job = launch {
+            testee.childClosedTabs.collect {
+                assertEquals("sourceId", it)
+            }
+        }
+
+        job.cancel()
+    }
+
     private fun tabDataRepository(dao: TabsDao): TabDataRepository {
         return TabDataRepository(
             dao,
             SiteFactory(mockPrivacyPractices, mockEntityLookup),
             mockWebViewPreviewPersister,
             mockFaviconManager,
-            useOurAppDetector,
-            GlobalScope
+            TestCoroutineScope()
         )
     }
 

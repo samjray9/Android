@@ -20,6 +20,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
+import com.duckduckgo.app.di.AppCoroutineScope
 import com.duckduckgo.app.global.DefaultDispatcherProvider
 import com.duckduckgo.app.global.DispatcherProvider
 import com.duckduckgo.app.global.SingleLiveEvent
@@ -29,17 +30,16 @@ import com.duckduckgo.app.privacy.db.UserWhitelistDao
 import com.duckduckgo.app.privacy.model.UserWhitelistedDomain
 import com.duckduckgo.app.privacy.ui.WhitelistViewModel.Command.*
 import com.duckduckgo.di.scopes.AppObjectGraph
-import com.squareup.anvil.annotations.ContributesTo
-import dagger.Module
-import dagger.Provides
-import dagger.multibindings.IntoSet
-import kotlinx.coroutines.GlobalScope
+import com.squareup.anvil.annotations.ContributesMultibinding
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Singleton
+import javax.inject.Inject
+import javax.inject.Provider
 
 class WhitelistViewModel(
     private val dao: UserWhitelistDao,
+    @AppCoroutineScope private val appCoroutineScope: CoroutineScope,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : ViewModel() {
 
@@ -87,7 +87,7 @@ class WhitelistViewModel(
             command.value = ShowWhitelistFormatError
             return
         }
-        GlobalScope.launch(dispatchers.io()) {
+        appCoroutineScope.launch(dispatchers.io()) {
             addEntryToDatabase(entry)
         }
     }
@@ -101,7 +101,7 @@ class WhitelistViewModel(
             command.value = ShowWhitelistFormatError
             return
         }
-        GlobalScope.launch(dispatchers.io()) {
+        appCoroutineScope.launch(dispatchers.io()) {
             deleteEntryFromDatabase(old)
             addEntryToDatabase(new)
         }
@@ -112,7 +112,7 @@ class WhitelistViewModel(
     }
 
     fun onEntryDeleted(entry: UserWhitelistedDomain) {
-        GlobalScope.launch(dispatchers.io()) {
+        appCoroutineScope.launch(dispatchers.io()) {
             deleteEntryFromDatabase(entry)
         }
     }
@@ -126,26 +126,15 @@ class WhitelistViewModel(
     }
 }
 
-@Module
-@ContributesTo(AppObjectGraph::class)
-class WhitelistViewModelFactoryModule {
-    @Provides
-    @Singleton
-    @IntoSet
-    fun provideWhitelistViewModelFactory(
-        dao: UserWhitelistDao
-    ): ViewModelFactoryPlugin {
-        return WhitelistViewModelFactory(dao)
-    }
-}
-
-private class WhitelistViewModelFactory(
-    private val dao: UserWhitelistDao
+@ContributesMultibinding(AppObjectGraph::class)
+class WhitelistViewModelFactory @Inject constructor(
+    private val dao: Provider<UserWhitelistDao>,
+    private val appCoroutineScope: Provider<CoroutineScope>
 ) : ViewModelFactoryPlugin {
     override fun <T : ViewModel?> create(modelClass: Class<T>): T? {
         with(modelClass) {
             return when {
-                isAssignableFrom(WhitelistViewModel::class.java) -> (WhitelistViewModel(dao) as T)
+                isAssignableFrom(WhitelistViewModel::class.java) -> (WhitelistViewModel(dao.get(), appCoroutineScope.get()) as T)
                 else -> null
             }
         }

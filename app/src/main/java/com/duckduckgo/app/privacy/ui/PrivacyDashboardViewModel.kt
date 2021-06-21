@@ -19,12 +19,14 @@ package com.duckduckgo.app.privacy.ui
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.*
 import com.duckduckgo.app.brokensite.BrokenSiteData
+import com.duckduckgo.app.di.AppCoroutineScope
 import com.duckduckgo.app.global.DefaultDispatcherProvider
 import com.duckduckgo.app.global.DispatcherProvider
 import com.duckduckgo.app.global.SingleLiveEvent
 import com.duckduckgo.app.global.model.Site
 import com.duckduckgo.app.global.model.domain
 import com.duckduckgo.app.global.plugins.view_model.ViewModelFactoryPlugin
+import com.duckduckgo.app.pixels.AppPixelName.*
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardEntry
 import com.duckduckgo.app.privacy.db.UserWhitelistDao
@@ -35,21 +37,19 @@ import com.duckduckgo.app.privacy.model.PrivacyPractices.Summary.UNKNOWN
 import com.duckduckgo.app.privacy.ui.PrivacyDashboardViewModel.Command.LaunchManageWhitelist
 import com.duckduckgo.app.privacy.ui.PrivacyDashboardViewModel.Command.LaunchReportBrokenSite
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.*
 import com.duckduckgo.di.scopes.AppObjectGraph
-import com.squareup.anvil.annotations.ContributesTo
-import dagger.Module
-import dagger.Provides
-import dagger.multibindings.IntoSet
-import kotlinx.coroutines.GlobalScope
+import com.squareup.anvil.annotations.ContributesMultibinding
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Singleton
+import javax.inject.Inject
+import javax.inject.Provider
 
 class PrivacyDashboardViewModel(
     private val userWhitelistDao: UserWhitelistDao,
     networkLeaderboardDao: NetworkLeaderboardDao,
     private val pixel: Pixel,
+    @AppCoroutineScope private val appCoroutineScope: CoroutineScope,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : ViewModel() {
 
@@ -178,7 +178,7 @@ class PrivacyDashboardViewModel(
         )
 
         val domain = site?.domain ?: return
-        GlobalScope.launch(dispatchers.io()) {
+        appCoroutineScope.launch(dispatchers.io()) {
             if (enabled) {
                 userWhitelistDao.delete(domain)
                 pixel.fire(PRIVACY_DASHBOARD_WHITELIST_REMOVE)
@@ -205,30 +205,17 @@ class PrivacyDashboardViewModel(
     }
 }
 
-@Module
-@ContributesTo(AppObjectGraph::class)
-class PrivacyDashboardViewModelFactoryModule {
-    @Provides
-    @Singleton
-    @IntoSet
-    fun providePrivacyDashboardViewModelFactory(
-        userWhitelistDao: UserWhitelistDao,
-        networkLeaderboardDao: NetworkLeaderboardDao,
-        pixel: Pixel
-    ): ViewModelFactoryPlugin {
-        return PrivacyDashboardViewModelFactory(userWhitelistDao, networkLeaderboardDao, pixel)
-    }
-}
-
-private class PrivacyDashboardViewModelFactory(
-    private val userWhitelistDao: UserWhitelistDao,
-    private val networkLeaderboardDao: NetworkLeaderboardDao,
-    private val pixel: Pixel
+@ContributesMultibinding(AppObjectGraph::class)
+class PrivacyDashboardViewModelFactory @Inject constructor(
+    private val userWhitelistDao: Provider<UserWhitelistDao>,
+    private val networkLeaderboardDao: Provider<NetworkLeaderboardDao>,
+    private val pixel: Provider<Pixel>,
+    private val appCoroutineScope: Provider<CoroutineScope>
 ) : ViewModelFactoryPlugin {
     override fun <T : ViewModel?> create(modelClass: Class<T>): T? {
         with(modelClass) {
             return when {
-                isAssignableFrom(PrivacyDashboardViewModel::class.java) -> PrivacyDashboardViewModel(userWhitelistDao, networkLeaderboardDao, pixel) as T
+                isAssignableFrom(PrivacyDashboardViewModel::class.java) -> PrivacyDashboardViewModel(userWhitelistDao.get(), networkLeaderboardDao.get(), pixel.get(), appCoroutineScope.get()) as T
                 else -> null
             }
         }

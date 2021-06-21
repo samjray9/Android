@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -231,6 +215,16 @@
     <string name="noBookmarks">Zaznamki še niso dodani</string>
     <string name="bookmarkOverflowContentDescription">Več možnosti za zaznamek %1$s</string>
     <string name="bookmarkEdited">Zaznamek je dodan</string>
+    <string name="bookmarkDeleteConfirmationMessage">Izbrisano &lt;b&gt;%1$s&lt;/b&gt;</string>
+    <string name="exportBookmarksMenu">Izvozi</string>
+    <string name="exportBookmarksEmpty">Nimate zaznamkov, nič ne bo izvoženo</string>
+    <string name="exportBookmarksError">Zaznamkov ni bilo mogoče izvoziti, nekaj je šlo narobe</string>
+    <string name="exportBookmarksSuccess">Vsi zaznamki so uspešno izvoženi</string>
+    <string name="importBookmarksMenu">Uvozi</string>
+    <string name="importBookmarksFileTitle">Izberite datoteko zaznamka za uvoz</string>
+    <string name="importBookmarksError">Zaznamkov ni bilo mogoče uvoziti, nekaj je šlo narobe</string>
+    <string name="importBookmarksEmpty">Datoteka nima zaznamkov za uvoz</string>
+    <string name="importBookmarksSuccess">Uspešno uvoženih %1$d zaznamkov</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Potrdi</string>
@@ -496,6 +490,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Ne zdaj</string>
     <string name="fireproofWebsiteItemsSectionTitle">Spletna mesta</string>
     <string name="fireproofWebsiteToogleText">Vprašajte ob prijavi</string>
+    <string name="disableLoginDetectionDialogTitle">Onemogoči opomnik o požarni zaščiti pri prijavi na spletna mesta?</string>
+    <string name="disableLoginDetectionDialogDescription">To nastavitev lahko kadar koli spremenite v možnosti Nastavitve.</string>
+    <string name="disableLoginDetectionDialogPositive">ONEMOGOČI</string>
+    <string name="disableLoginDetectionDialogNegative">PREKLIČI</string>
+    <string name="fireproofWebsiteRemovalConfirmation">Požarna zaščita odstranjena za &lt;b&gt;%1$s&lt;/b&gt;</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Animacija za gumb ogenj</string>
@@ -544,12 +543,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Globalni nadzor zasebnosti (GPC)</string>
     <string name="globalPrivacyControlDescription">
-        Vaši podatki ne bi smeli biti naprodaj. Pri DuckDuckGo se strinjamo. Aktivirajte nastavitev globalni nadzor zasebnosti (Global Privacy Control (GPC) in spletnim mestom bomo sporočili vaše nastavitve:&lt;br/&gt;&lt;br/&gt;• Ne prodajajte svojih osebnih podatkov.&lt;br/&gt;• Omejite skupno rabo svojih osebnih podatkov z drugimi podjetji.
+        <![CDATA[DuckDuckGo samodejno blokira številne sledilce. Z globalnim nadzorom zasebnosti (GPC) lahko tudi od sodelujočih spletnih mest zahtevate, da omejijo prodajo ali skupno rabo vaših osebnih podatkov z drugimi podjetji. <u><a href="">Več</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Globalni nadzor zasebnosti (GPC)</string>
     <string name="globalPrivacyControlToggle">Globalni nadzor zasebnosti (GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Ker je globalni nadzor zasebnosti (Global Privacy Control (GPC)) nov standard, ga večina spletnih mest še ne prepozna, vendar si močno prizadevamo, da bi bil sprejet po vsem svetu.</b> Vendar morajo spletna mesta na podlagi signala ukrepati le v meri, ki jo določajo veljavni zakoni.</string>
-    <string name="globalPrivacyControlLearnMore"><u>Več</u></string>
     <string name="disabled">Onemogočeno</string>
     <string name="enabled">Omogočeno</string>
 </resources>

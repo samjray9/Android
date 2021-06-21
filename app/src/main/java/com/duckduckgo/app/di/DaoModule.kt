@@ -51,6 +51,9 @@ class DaoModule {
     fun providesBookmarksDao(database: AppDatabase) = database.bookmarksDao()
 
     @Provides
+    fun providesFavoritesDao(database: AppDatabase) = database.favoritesDao()
+
+    @Provides
     fun providesTabsDao(database: AppDatabase) = database.tabsDao()
 
     @Provides
@@ -88,4 +91,7 @@ class DaoModule {
 
     @Provides
     fun locationPermissionsDao(database: AppDatabase) = database.locationPermissionsDao()
+
+    @Provides
+    fun allowedDomainsDao(database: AppDatabase) = database.authCookiesAllowedDomainsDao()
 }

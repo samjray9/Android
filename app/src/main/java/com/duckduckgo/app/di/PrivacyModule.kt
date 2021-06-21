@@ -17,8 +17,10 @@
 package com.duckduckgo.app.di
 
 import android.content.Context
+import androidx.lifecycle.LifecycleObserver
 import androidx.work.WorkManager
 import com.duckduckgo.app.browser.WebDataManager
+import com.duckduckgo.app.browser.cookies.ThirdPartyCookieManager
 import com.duckduckgo.app.fire.*
 import com.duckduckgo.app.fire.fireproofwebsite.data.FireproofWebsiteRepository
 import com.duckduckgo.app.global.DispatcherProvider
@@ -39,6 +41,7 @@ import com.duckduckgo.app.trackerdetection.db.TdsDomainEntityDao
 import com.duckduckgo.app.trackerdetection.db.TdsEntityDao
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
 @Module
@@ -63,7 +66,8 @@ class PrivacyModule {
         settingsDataStore: SettingsDataStore,
         cookieManager: DuckDuckGoCookieManager,
         appCacheClearer: AppCacheClearer,
-        geoLocationPermissions: GeoLocationPermissions
+        geoLocationPermissions: GeoLocationPermissions,
+        thirdPartyCookieManager: ThirdPartyCookieManager
     ): ClearDataAction {
         return ClearPersonalDataAction(
             context,
@@ -73,7 +77,8 @@ class PrivacyModule {
             settingsDataStore,
             cookieManager,
             appCacheClearer,
-            geoLocationPermissions
+            geoLocationPermissions,
+            thirdPartyCookieManager
         )
     }
 
@@ -93,6 +98,18 @@ class PrivacyModule {
     ): DataClearer {
         return AutomaticDataClearer(workManager, settingsDataStore, clearDataAction, dataClearerTimeKeeper, dataClearerForegroundAppRestartPixel)
     }
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun dataClearerLifecycleObserver(dataClearer: DataClearer): LifecycleObserver = dataClearer
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun dataClearerForegroundAppRestartPixelObserver(
+        dataClearerForegroundAppRestartPixel: DataClearerForegroundAppRestartPixel
+    ): LifecycleObserver = dataClearerForegroundAppRestartPixel
 
     @Provides
     @Singleton

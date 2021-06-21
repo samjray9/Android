@@ -18,12 +18,17 @@ package com.duckduckgo.app.browser.di
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.webkit.CookieManager
 import android.webkit.WebSettings
+import androidx.lifecycle.LifecycleObserver
 import com.duckduckgo.app.browser.*
 import com.duckduckgo.app.browser.addtohome.AddToHomeCapabilityDetector
 import com.duckduckgo.app.browser.addtohome.AddToHomeSystemCapabilityDetector
 import com.duckduckgo.app.browser.certificates.rootstore.TrustedCertificateStore
+import com.duckduckgo.app.browser.cookies.AppThirdPartyCookieManager
+import com.duckduckgo.app.browser.cookies.ThirdPartyCookieManager
+import com.duckduckgo.app.browser.cookies.db.AuthCookiesAllowedDomainsRepository
 import com.duckduckgo.app.browser.defaultbrowsing.AndroidDefaultBrowserDetector
 import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
 import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserObserver
@@ -32,6 +37,7 @@ import com.duckduckgo.app.browser.favicon.FaviconPersister
 import com.duckduckgo.app.browser.favicon.FileBasedFaviconPersister
 import com.duckduckgo.app.browser.httpauth.WebViewHttpAuthStore
 import com.duckduckgo.app.browser.logindetection.*
+import com.duckduckgo.app.browser.serviceworker.ServiceWorkerLifecycleObserver
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.browser.session.WebViewSessionStorage
 import com.duckduckgo.app.browser.tabpreview.FileBasedWebViewPreviewGenerator
@@ -39,6 +45,8 @@ import com.duckduckgo.app.browser.tabpreview.FileBasedWebViewPreviewPersister
 import com.duckduckgo.app.browser.tabpreview.WebViewPreviewGenerator
 import com.duckduckgo.app.browser.tabpreview.WebViewPreviewPersister
 import com.duckduckgo.app.browser.useragent.UserAgentProvider
+import com.duckduckgo.app.di.AppCoroutineScope
+import com.duckduckgo.app.email.EmailInjector
 import com.duckduckgo.app.fire.*
 import com.duckduckgo.app.fire.fireproofwebsite.data.FireproofWebsiteDao
 import com.duckduckgo.app.fire.fireproofwebsite.data.FireproofWebsiteRepository
@@ -49,7 +57,6 @@ import com.duckduckgo.app.global.events.db.UserEventsStore
 import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
 import com.duckduckgo.app.global.file.FileDeleter
 import com.duckduckgo.app.global.install.AppInstallStore
-import com.duckduckgo.app.global.useourapp.UseOurAppDetector
 import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
 import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControlManager
 import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
@@ -66,6 +73,9 @@ import com.duckduckgo.app.tabs.ui.GridViewColumnCalculator
 import com.duckduckgo.app.trackerdetection.TrackerDetector
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.IntoSet
+import kotlinx.coroutines.CoroutineScope
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -93,7 +103,11 @@ class BrowserModule {
         cookieManager: CookieManager,
         loginDetector: DOMLoginDetector,
         dosDetector: DosDetector,
-        globalPrivacyControl: GlobalPrivacyControl
+        globalPrivacyControl: GlobalPrivacyControl,
+        thirdPartyCookieManager: ThirdPartyCookieManager,
+        @AppCoroutineScope appCoroutineScope: CoroutineScope,
+        dispatcherProvider: DispatcherProvider,
+        emailInjector: EmailInjector
     ): BrowserWebViewClient {
         return BrowserWebViewClient(
             webViewHttpAuthStore,
@@ -106,7 +120,11 @@ class BrowserModule {
             cookieManager,
             loginDetector,
             dosDetector,
-            globalPrivacyControl
+            globalPrivacyControl,
+            thirdPartyCookieManager,
+            appCoroutineScope,
+            dispatcherProvider,
+            emailInjector
         )
     }
 
@@ -121,11 +139,13 @@ class BrowserModule {
     }
 
     @Provides
+    @Singleton
+    @IntoSet
     fun defaultBrowserObserver(
         defaultBrowserDetector: DefaultBrowserDetector,
         appInstallStore: AppInstallStore,
         pixel: Pixel
-    ): DefaultBrowserObserver {
+    ): LifecycleObserver {
         return DefaultBrowserObserver(defaultBrowserDetector, appInstallStore, pixel)
     }
 
@@ -155,7 +175,7 @@ class BrowserModule {
     }
 
     @Provides
-    fun specialUrlDetector(): SpecialUrlDetector = SpecialUrlDetectorImpl()
+    fun specialUrlDetector(packageManager: PackageManager, settingsDataStore: SettingsDataStore): SpecialUrlDetector = SpecialUrlDetectorImpl(packageManager, settingsDataStore)
 
     @Provides
     @Singleton
@@ -192,7 +212,7 @@ class BrowserModule {
 
     @Provides
     fun sqlCookieRemover(
-        webViewDatabaseLocator: WebViewDatabaseLocator,
+        @Named("webViewDbLocator") webViewDatabaseLocator: DatabaseLocator,
         getCookieHostsToPreserve: GetCookieHostsToPreserve,
         offlinePixelCountDataStore: OfflinePixelCountDataStore,
         exceptionPixel: ExceptionPixel,
@@ -202,7 +222,15 @@ class BrowserModule {
     }
 
     @Provides
-    fun webViewDatabaseLocator(context: Context): WebViewDatabaseLocator = WebViewDatabaseLocator(context)
+    @Named("webViewDbLocator")
+    fun webViewDatabaseLocator(context: Context): DatabaseLocator = WebViewDatabaseLocator(context)
+
+    @Provides
+    @Named("authDbLocator")
+    fun authDatabaseLocator(context: Context): DatabaseLocator = AuthDatabaseLocator(context)
+
+    @Provides
+    fun databaseCleanerHelper(): DatabaseCleaner = DatabaseCleanerHelper()
 
     @Provides
     fun getCookieHostsToPreserve(fireproofWebsiteDao: FireproofWebsiteDao): GetCookieHostsToPreserve = GetCookieHostsToPreserve(fireproofWebsiteDao)
@@ -244,8 +272,8 @@ class BrowserModule {
     }
 
     @Provides
-    fun domLoginDetector(settingsDataStore: SettingsDataStore, useOurAppDetector: UseOurAppDetector): DOMLoginDetector {
-        return JsLoginDetector(settingsDataStore, useOurAppDetector)
+    fun domLoginDetector(settingsDataStore: SettingsDataStore): DOMLoginDetector {
+        return JsLoginDetector(settingsDataStore)
     }
 
     @Provides
@@ -254,8 +282,11 @@ class BrowserModule {
     }
 
     @Provides
-    fun navigationAwareLoginDetector(settingsDataStore: SettingsDataStore): NavigationAwareLoginDetector {
-        return NextPageLoginDetection(settingsDataStore)
+    fun navigationAwareLoginDetector(
+        settingsDataStore: SettingsDataStore,
+        @AppCoroutineScope appCoroutineScope: CoroutineScope
+    ): NavigationAwareLoginDetector {
+        return NextPageLoginDetection(settingsDataStore, appCoroutineScope)
     }
 
     @Provides
@@ -279,4 +310,15 @@ class BrowserModule {
     ): FireproofDialogsEventHandler {
         return BrowserTabFireproofDialogsEventHandler(userEventsStore, pixel, fireproofWebsiteRepository, appSettingsPreferencesStore, variantManager, dispatchers)
     }
+
+    @Singleton
+    @Provides
+    fun thirdPartyCookieManager(cookieManager: CookieManager, authCookiesAllowedDomainsRepository: AuthCookiesAllowedDomainsRepository): ThirdPartyCookieManager {
+        return AppThirdPartyCookieManager(cookieManager, authCookiesAllowedDomainsRepository)
+    }
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun serviceWorkerLifecycleObserver(serviceWorkerLifecycleObserver: ServiceWorkerLifecycleObserver): LifecycleObserver = serviceWorkerLifecycleObserver
 }

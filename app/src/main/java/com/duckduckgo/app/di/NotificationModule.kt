@@ -21,13 +21,11 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
-import com.duckduckgo.app.browser.addtohome.AddToHomeCapabilityDetector
 import com.duckduckgo.app.notification.AndroidNotificationScheduler
 import com.duckduckgo.app.notification.NotificationFactory
 import com.duckduckgo.app.notification.NotificationScheduler
 import com.duckduckgo.app.notification.db.NotificationDao
 import com.duckduckgo.app.notification.model.ClearDataNotification
-import com.duckduckgo.app.notification.model.UseOurAppNotification
 import com.duckduckgo.app.notification.model.PrivacyProtectionNotification
 import com.duckduckgo.app.privacy.db.PrivacyProtectionCountDao
 import com.duckduckgo.app.settings.db.SettingsDataStore
@@ -54,16 +52,6 @@ class NotificationModule {
     @Singleton
     fun provideLocalBroadcastManager(context: Context): LocalBroadcastManager {
         return LocalBroadcastManager.getInstance(context)
-    }
-
-    @Provides
-    fun provideUseOurAppNotification(
-        context: Context,
-        notificationDao: NotificationDao,
-        settingsDataStore: SettingsDataStore,
-        addToHomeCapabilityDetector: AddToHomeCapabilityDetector
-    ): UseOurAppNotification {
-        return UseOurAppNotification(context, notificationDao, settingsDataStore, addToHomeCapabilityDetector)
     }
 
     @Provides

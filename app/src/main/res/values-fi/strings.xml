@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -223,6 +207,16 @@
     <string name="noBookmarks">Kirjanmerkkejä ei ole vielä lisätty</string>
     <string name="bookmarkOverflowContentDescription">Lisää vaihtoehtoja kirjanmerkille %1$s</string>
     <string name="bookmarkEdited">Kirjanmerkki lisätty</string>
+    <string name="bookmarkDeleteConfirmationMessage">Poistettiin &lt;b&gt;%1$s&lt;/b&gt;</string>
+    <string name="exportBookmarksMenu">Vie</string>
+    <string name="exportBookmarksEmpty">Sinulla ei ole kirjanmerkkejä, mitään ei viedä.</string>
+    <string name="exportBookmarksError">Kirjanmerkkejä ei voitu viedä, jokin meni vikaan</string>
+    <string name="exportBookmarksSuccess">Kaikki kirjanmerkit on viety</string>
+    <string name="importBookmarksMenu">Tuo</string>
+    <string name="importBookmarksFileTitle">Valitse kirjanmerkkitiedosto tuotavaksi</string>
+    <string name="importBookmarksError">Kirjanmerkkejä ei voitu tuoda, jokin meni vikaan</string>
+    <string name="importBookmarksEmpty">Tiedostossa ei ole tuotavia kirjanmerkkejä</string>
+    <string name="importBookmarksSuccess">%1$d kirjanmerkkiä tuotu</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Vahvista</string>
@@ -484,6 +478,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Ei nyt</string>
     <string name="fireproofWebsiteItemsSectionTitle">Verkkosivustot</string>
     <string name="fireproofWebsiteToogleText">Kysy sisäänkirjautumisen yhteydessä</string>
+    <string name="disableLoginDetectionDialogTitle">Poistetaanko palonkestävyyden muistutus käytöstä sivustoille kirjauduttaessa?</string>
+    <string name="disableLoginDetectionDialogDescription">Voit muuttaa valintaa milloin tahansa asetuksista.</string>
+    <string name="disableLoginDetectionDialogPositive">POISTA KÄYTÖSTÄ</string>
+    <string name="disableLoginDetectionDialogNegative">PERUUTA</string>
+    <string name="fireproofWebsiteRemovalConfirmation">Palonkestävyys poistettu sivustolta &lt;b&gt;%1$s&lt;/b&gt;</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Liekki-painikkeen animaatio</string>
@@ -532,12 +531,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Global Privacy Control (GPC)</string>
     <string name="globalPrivacyControlDescription">
-        Tietojesi ei pitäisi olla myynnissä. DuckDuckGo on samaa mieltä. Ota \"Global Privacy Control\" (GPC) -asetus käyttöön, niin me kerromme verkkosivustoille, että:&lt;br/&gt;&lt;br/&gt;• ne eivät voi myydä tietojasi.&lt;br/&gt; • niiden täytyy rajoittaa henkilötietojesi jakamista muille yrityksille.
+        <![CDATA[DuckDuckGo estää monet seurannat automaattisesti. GPC:n (Global Privacy Control) avulla voit myös pyytää osallistuvia sivustoja rajoittamaan henkilötietojesi myyntiä tai jakamista muiden yritysten kanssa. <u><a href="">Lue lisää</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Global Privacy Control (GPC)</string>
     <string name="globalPrivacyControlToggle">Global Privacy Control (GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Koska Global Privacy Control (GPC) on uusi standardi, useimmat verkkosivustot eivät vielä tunnista sitä, mutta teemme parhaamme, että standardi hyväksyttäisiin kaikkialla maailmassa.</b> Verkkosivujen täytyy kuitenkin noudattaa kehotusta vain siinä laajuudessa kuin sovellettavat lait määräävät.</string>
-    <string name="globalPrivacyControlLearnMore"><u>Lue Lisää</u></string>
     <string name="disabled">Pois käytöstä</string>
     <string name="enabled">Käytössä</string>
 </resources>

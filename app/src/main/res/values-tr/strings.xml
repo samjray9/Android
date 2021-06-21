@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -223,6 +207,16 @@
     <string name="noBookmarks">Henüz yer işareti eklenmedi</string>
     <string name="bookmarkOverflowContentDescription">%1$s yer imi için diğer seçenekler</string>
     <string name="bookmarkEdited">Yer imi eklendi</string>
+    <string name="bookmarkDeleteConfirmationMessage">&lt;b&gt;%1$s&lt;/b&gt; silindi</string>
+    <string name="exportBookmarksMenu">Dışa Aktar</string>
+    <string name="exportBookmarksEmpty">Yer işaretiniz olmadığından hiçbir şey dışa aktarılmayacak</string>
+    <string name="exportBookmarksError">Yer işaretleri dışa aktarılamadı, bir hata oluştu</string>
+    <string name="exportBookmarksSuccess">Tüm yer işaretleri başarıyla dışa aktarıldı</string>
+    <string name="importBookmarksMenu">İçe Aktar</string>
+    <string name="importBookmarksFileTitle">İçe aktarılacak bir yer işareti dosyası seçin</string>
+    <string name="importBookmarksError">Yer işaretleri içe aktarılamadı, bir hata oluştu</string>
+    <string name="importBookmarksEmpty">Dosyada içe aktarılacak yer işareti yok</string>
+    <string name="importBookmarksSuccess">%1$d yer işareti başarıyla içe aktarıldı</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Onayla</string>
@@ -484,6 +478,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Şimdi değil</string>
     <string name="fireproofWebsiteItemsSectionTitle">Web siteleri</string>
     <string name="fireproofWebsiteToogleText">Oturum Açarken Sor</string>
+    <string name="disableLoginDetectionDialogTitle">Sitelerde oturum açılırken Koruma hatırlatıcısı devre dışı bırakılsın mı?</string>
+    <string name="disableLoginDetectionDialogDescription">Bu tercihi istediğiniz zaman Ayarlar\'dan değiştirebilirsiniz.</string>
+    <string name="disableLoginDetectionDialogPositive">DEVRE DIŞI BIRAK</string>
+    <string name="disableLoginDetectionDialogNegative">İPTAL</string>
+    <string name="fireproofWebsiteRemovalConfirmation">&lt;b&gt;%1$s&lt;/b&gt; için Koruma kaldırıldı</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Yangın Düğmesi Animasyonu</string>
@@ -532,12 +531,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Küresel Gizlilik Kontrolü (GPC)</string>
     <string name="globalPrivacyControlDescription">
-        Verileriniz satılık olmamalı. DuckDuckGo\'da aynı fikirdeyiz. \"Küresel Gizlilik Kontrolü\" (GPC) ayarını etkinleştirirseniz web sitelerine şu tercihleri yaptığınızı bildiririz:&lt;br/&gt;&lt;br/&gt; • Kişisel verilerinizin satılmasını istemediğinizi.&lt;br/&gt; • Kişisel verilerinizin diğer şirketlerle paylaşımının sınırlandırılmasını istediğinizi.
+        <![CDATA[DuckDuckGo birçok izleyiciyi otomatik olarak engeller. Küresel Gizlilik Kontrolü (GPC) ile, katılımcı web sitelerinden kişisel verilerinizin satışını veya diğer şirketlerle paylaşımını kısıtlamalarını da isteyebilirsiniz. <u><a href="">Daha Fazla Bilgi</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Küresel Gizlilik Kontrolü (GPC)</string>
     <string name="globalPrivacyControlToggle">Küresel Gizlilik Kontrolü (GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Küresel Gizlilik Kontrolü (GPC) yeni bir standart olduğundan, çoğu web sitesi tarafından henüz tanınmayacaktır. Ancak, dünya çapında benimsenmesini sağlamak için elimizden geleni yapıyoruz.</b> Bununla birlikte, web sitelerinin onlara bildirilen tercihleri yalnızca geçerli yasaların zorunlu kıldığı ölçüde dikkate almaları gerekmektedir.</string>
-    <string name="globalPrivacyControlLearnMore"><u>Daha Fazla Bilgi</u></string>
     <string name="disabled">Devre Dışı</string>
     <string name="enabled">Etkin</string>
 </resources>

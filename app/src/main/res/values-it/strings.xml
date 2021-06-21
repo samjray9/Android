@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -223,6 +207,16 @@
     <string name="noBookmarks">Non è ancora stato aggiunto nessun segnalibro</string>
     <string name="bookmarkOverflowContentDescription">Ulteriori opzioni per il segnalibro %1$s</string>
     <string name="bookmarkEdited">Segnalibro aggiunto</string>
+    <string name="bookmarkDeleteConfirmationMessage">&lt;b&gt;%1$s&lt;/b&gt; eliminato</string>
+    <string name="exportBookmarksMenu">Esporta</string>
+    <string name="exportBookmarksEmpty">Non hai alcun segnalibro, quindi non verrà esportato nulla</string>
+    <string name="exportBookmarksError">Impossibile esportare i segnalibri, si è verificato un errore</string>
+    <string name="exportBookmarksSuccess">Tutti i segnalibri sono stati esportati correttamente</string>
+    <string name="importBookmarksMenu">Importa</string>
+    <string name="importBookmarksFileTitle">Seleziona un file di segnalibri da importare</string>
+    <string name="importBookmarksError">Impossibile importare i segnalibri, si è verificato un errore</string>
+    <string name="importBookmarksEmpty">Il file non contiene nessun segnalibro da importare</string>
+    <string name="importBookmarksSuccess">%1$d segnalibri sono stati importati correttamente</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Conferma</string>
@@ -484,6 +478,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Non adesso</string>
     <string name="fireproofWebsiteItemsSectionTitle">Siti web</string>
     <string name="fireproofWebsiteToogleText">Chiedi al momento dell\'accesso</string>
+    <string name="disableLoginDetectionDialogTitle">Disabilitare il promemoria per la protezione quando si accede ai siti?</string>
+    <string name="disableLoginDetectionDialogDescription">Puoi modificare questa preferenza in qualsiasi momento nella sezione Impostazioni.</string>
+    <string name="disableLoginDetectionDialogPositive">DISABILITA</string>
+    <string name="disableLoginDetectionDialogNegative">ANNULLA</string>
+    <string name="fireproofWebsiteRemovalConfirmation">Protezione rimossa per &lt;b&gt;%1$s&lt;/b&gt;</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Animazione pulsante fuoco</string>
@@ -532,12 +531,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Global Privacy Control (GPC)</string>
     <string name="globalPrivacyControlDescription">
-        I tuoi dati non dovrebbero mai essere messi in vendita. Noi di DuckDuckGo ne siamo convinti. Attiva l\'impostazione \"Global Privacy Control\" (GPC) e segnaleremo ai siti web di:&lt;br/&gt;&lt;br/&gt;• Non vendere i tuoi dati personali.&lt;br/&gt;• Limitare la condivisione dei tuoi dati personali con altre aziende.
+        <![CDATA[DuckDuckGo blocca automaticamente molti sistemi di tracciamento. Con la funzione Global Privacy Control (GPC), puoi anche chiedere ai siti web aderenti di impedire la vendita o la condivisione dei tuoi dati personali con altre aziende. <u><a href="">Ulteriori informazioni</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Global Privacy Control (GPC)</string>
     <string name="globalPrivacyControlToggle">Global Privacy Control (GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Dal momento che il Global Privacy Control (GPC) rappresenta un nuovo standard, la maggior parte dei siti web non lo riconosce ancora, ma ci stiamo impegnando al massimo per assicurarci che venga accettato in tutto il mondo.</b> Tuttavia, i siti web sono tenuti a rispondere alla segnalazione esclusivamente nei limiti delle leggi pertinenti che li obbligano ad agire in tal senso.</string>
-    <string name="globalPrivacyControlLearnMore"><u>Maggiori informazioni</u></string>
     <string name="disabled">Disattivato</string>
     <string name="enabled">Attivato</string>
 </resources>

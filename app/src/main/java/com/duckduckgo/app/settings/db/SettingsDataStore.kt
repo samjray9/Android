@@ -26,7 +26,6 @@ import com.duckduckgo.app.settings.clear.ClearWhatOption
 import com.duckduckgo.app.settings.clear.ClearWhenOption
 import com.duckduckgo.app.settings.clear.FireAnimation
 import com.duckduckgo.app.statistics.VariantManager
-import com.duckduckgo.app.statistics.loginDetectionExperimentEnabled
 
 interface SettingsDataStore {
 
@@ -42,6 +41,7 @@ interface SettingsDataStore {
     var appLocationPermission: Boolean
     var appLocationPermissionDeniedForever: Boolean
     var globalPrivacyControlEnabled: Boolean
+    var appLinksEnabled: Boolean
 
     /**
      * This will be checked upon app startup and used to decide whether it should perform a clear or not.
@@ -91,7 +91,7 @@ class SettingsSharedPreferences constructor(private val context: Context, privat
         set(enabled) = preferences.edit { putBoolean(KEY_AUTOCOMPLETE_ENABLED, enabled) }
 
     override var appLoginDetection: Boolean
-        get() = preferences.getBoolean(KEY_LOGIN_DETECTION_ENABLED, variantManager.loginDetectionExperimentEnabled())
+        get() = preferences.getBoolean(KEY_LOGIN_DETECTION_ENABLED, true)
         set(enabled) = preferences.edit { putBoolean(KEY_LOGIN_DETECTION_ENABLED, enabled) }
 
     override var appLocationPermission: Boolean
@@ -147,6 +147,10 @@ class SettingsSharedPreferences constructor(private val context: Context, privat
         get() = preferences.getBoolean(KEY_DO_NOT_SELL_ENABLED, true)
         set(enabled) = preferences.edit { putBoolean(KEY_DO_NOT_SELL_ENABLED, enabled) }
 
+    override var appLinksEnabled: Boolean
+        get() = preferences.getBoolean(APP_LINKS_ENABLED, true)
+        set(enabled) = preferences.edit { putBoolean(APP_LINKS_ENABLED, enabled) }
+
     override fun hasBackgroundTimestampRecorded(): Boolean = preferences.contains(KEY_APP_BACKGROUNDED_TIMESTAMP)
     override fun clearAppBackgroundTimestamp() = preferences.edit { remove(KEY_APP_BACKGROUNDED_TIMESTAMP) }
 
@@ -200,6 +204,7 @@ class SettingsSharedPreferences constructor(private val context: Context, privat
         const val KEY_SITE_LOCATION_PERMISSION_ENABLED = "KEY_SITE_LOCATION_PERMISSION_ENABLED"
         const val KEY_SYSTEM_LOCATION_PERMISSION_DENIED_FOREVER = "KEY_SYSTEM_LOCATION_PERMISSION_DENIED_FOREVER"
         const val KEY_DO_NOT_SELL_ENABLED = "KEY_DO_NOT_SELL_ENABLED"
+        const val APP_LINKS_ENABLED = "APP_LINKS_ENABLED"
 
         private val DEFAULT_ICON = if (BuildConfig.DEBUG) {
             AppIcon.BLUE

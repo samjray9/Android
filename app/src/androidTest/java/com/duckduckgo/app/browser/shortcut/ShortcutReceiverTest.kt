@@ -17,43 +17,38 @@
 package com.duckduckgo.app.browser.shortcut
 
 import android.content.Intent
-import com.duckduckgo.app.global.events.db.UserEventsStore
-import com.duckduckgo.app.global.useourapp.UseOurAppDetector
+import com.duckduckgo.app.CoroutineTestRule
+import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestCoroutineScope
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
+@ExperimentalCoroutinesApi
 class ShortcutReceiverTest {
 
-    private val mockUserEventsStore: UserEventsStore = mock()
+    @get:Rule
+    var coroutinesTestRule = CoroutineTestRule()
+
     private val mockPixel: Pixel = mock()
     private lateinit var testee: ShortcutReceiver
 
     @Before
     fun before() {
-        testee = ShortcutReceiver(UseOurAppDetector(mockUserEventsStore), mockPixel)
+        testee = ShortcutReceiver(mockPixel, coroutinesTestRule.testDispatcherProvider, TestCoroutineScope())
     }
 
     @Test
-    fun whenIntentReceivedIfUrlContainsUseOurAppDomainThenFirePixel() {
-        val intent = Intent()
-        intent.putExtra(ShortcutBuilder.SHORTCUT_URL_ARG, "https://facebook.com")
-        intent.putExtra(ShortcutBuilder.SHORTCUT_TITLE_ARG, "Title")
-        testee.onReceive(null, intent)
-
-        verify(mockPixel).fire(Pixel.PixelName.USE_OUR_APP_SHORTCUT_ADDED)
-    }
-
-    @Test
-    fun whenIntentReceivedIfUrlIsNotFromUseOurAppDomainThenFireShortcutAddedPixel() {
+    fun whenIntentReceivedThenFireShortcutAddedPixel() {
         val intent = Intent()
         intent.putExtra(ShortcutBuilder.SHORTCUT_URL_ARG, "www.example.com")
         intent.putExtra(ShortcutBuilder.SHORTCUT_TITLE_ARG, "Title")
         testee.onReceive(null, intent)
 
-        verify(mockPixel).fire(Pixel.PixelName.SHORTCUT_ADDED)
+        verify(mockPixel).fire(AppPixelName.SHORTCUT_ADDED)
     }
-
 }

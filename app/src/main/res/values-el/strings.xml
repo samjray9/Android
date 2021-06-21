@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -223,6 +207,16 @@
     <string name="noBookmarks">Δεν προστέθηκαν σελιδοδείκτες ακόμα</string>
     <string name="bookmarkOverflowContentDescription">Περισσότερες επιλογές για σελιδοδείκτη %1$s</string>
     <string name="bookmarkEdited">Προστέθηκε σελιδοδείκτης</string>
+    <string name="bookmarkDeleteConfirmationMessage">Διαγράφηκε &lt;b&gt;%1$s&lt;/b&gt;</string>
+    <string name="exportBookmarksMenu">Εξαγωγή</string>
+    <string name="exportBookmarksEmpty">Δεν έχετε σελιδοδείκτες, οπότε δεν θα εξαχθεί κάτι</string>
+    <string name="exportBookmarksError">Δεν ήταν δυνατή η εξαγωγή σελιδοδεικτών, κάτι πήγε λάθος</string>
+    <string name="exportBookmarksSuccess">Η εξαγωγή όλων των σελιδοδεικτών πραγματοποιήθηκε με επιτυχία</string>
+    <string name="importBookmarksMenu">Εισαγωγή</string>
+    <string name="importBookmarksFileTitle">Επιλέξτε αρχείο σελιδοδείκτη προς εισαγωγή</string>
+    <string name="importBookmarksError">Δεν ήταν δυνατή η εισαγωγή σελιδοδεικτών, κάτι πήγε λάθος</string>
+    <string name="importBookmarksEmpty">Το αρχείο δεν έχει σελιδοδείκτες προς εισαγωγή</string>
+    <string name="importBookmarksSuccess">Επιτυχής εισαγωγή %1$d σελιδοδεικτών</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Επιβεβαίωση</string>
@@ -484,6 +478,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Όχι τώρα</string>
     <string name="fireproofWebsiteItemsSectionTitle">Ιστότοποι</string>
     <string name="fireproofWebsiteToogleText">Ερώτηση κατά τη σύνδεση</string>
+    <string name="disableLoginDetectionDialogTitle">Απενεργοποίηση της υπενθύμισης Διαγραφής δραστηριότητας κατά τη σύνδεση σε ιστότοπους;</string>
+    <string name="disableLoginDetectionDialogDescription">Μπορείτε να αλλάξετε την προτίμηση αυτή οποιαδήποτε στιγμή από τις Ρυθμίσεις.</string>
+    <string name="disableLoginDetectionDialogPositive">ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ</string>
+    <string name="disableLoginDetectionDialogNegative">ΑΚΥΡΩΣΗ</string>
+    <string name="fireproofWebsiteRemovalConfirmation">Η διαγραφή δραστηριότητας αφαιρέθηκε για το &lt;b&gt;%1$s&lt;/b&gt;</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Κινούμενο κουμπί φωτιάς</string>
@@ -532,12 +531,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Παγκόσμιος έλεγχος απορρήτου (GPC)</string>
     <string name="globalPrivacyControlDescription">
-        Τα δεδομένα σας δεν πρέπει να πωλούνται. Στην DuckDuckGo συμφωνούμε. Ενεργοποιήστε τη ρύθμιση \"Παγκόσμιος έλεγχος απορρήτου\" (GPC) και θα ενημερώσουμε τους ιστότοπους για την προτίμησή σας:&lt;br/&gt;&lt;br/&gt;• Να μην πωλούν τα προσωπικά δεδομένα σας.&lt;br/&gt;• Να περιορίσουν την κοινοποίηση των προσωπικών δεδομένων σας σε άλλες εταιρείες.
+        <![CDATA[Το DuckDuckGo αποκλείει αυτόματα πολλές εφαρμογές παρακολούθησης. Με τον Παγκόσμιο έλεγχο απορρήτου (GPC), μπορείτε επίσης να ζητήσετε από τους ιστότοπους που συμμετέχουν να περιορίσουν την πώληση ή την κοινοποίηση των προσωπικών δεδομένων σας σε άλλες εταιρείες. <u><a href="">Μάθετε περισσότερα</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Παγκόσμιος έλεγχος απορρήτου (GPC)</string>
     <string name="globalPrivacyControlToggle">Παγκόσμιος έλεγχος απορρήτου (GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Καθώς ο Παγκόσμιος έλεγχος απορρήτου (GPC) αποτελεί νέο πρότυπο, οι περισσότεροι ιστότοποι δεν θα το αναγνωρίζουν ακόμη, αλλά εργαζόμαστε σκληρά ώστε να εξασφαλίσουμε ότι θα γίνει αποδεκτό παγκοσμίως.</b> Ωστόσο, οι ιστότοποι είναι υποχρεωμένοι να ενεργούν μόνο στον βαθμό που τους υποχρεώνουν οι ισχύοντες νόμοι.</string>
-    <string name="globalPrivacyControlLearnMore"><u>Μάθετε περισσότερα</u></string>
     <string name="disabled">Απενεργοποιήθηκε</string>
     <string name="enabled">Ενεργοποιήθηκε</string>
 </resources>

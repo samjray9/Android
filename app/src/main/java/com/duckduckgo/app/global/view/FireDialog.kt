@@ -20,6 +20,8 @@ import android.animation.Animator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.os.Bundle
+import android.provider.Settings
+import android.provider.Settings.Global.ANIMATOR_DURATION_SCALE
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnDetach
 import androidx.core.view.isVisible
@@ -34,14 +36,13 @@ import com.duckduckgo.app.global.view.FireDialog.FireDialogClearAllEvent.ClearAl
 import com.duckduckgo.app.settings.clear.getPixelValue
 import com.duckduckgo.app.settings.db.SettingsDataStore
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.*
+import com.duckduckgo.app.pixels.AppPixelName.*
 import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.FIRE_ANIMATION
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.android.synthetic.main.include_dax_dialog_cta.*
 import kotlinx.android.synthetic.main.sheet_fire_clear_data.*
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -51,14 +52,14 @@ private const val ANIMATION_SPEED_INCREMENT = 0.15f
 class FireDialog(
     context: Context,
     private val ctaViewModel: CtaViewModel,
-    private val clearPersonalDataAction: ClearPersonalDataAction,
+    private val clearPersonalDataAction: ClearDataAction,
     private val pixel: Pixel,
     private val settingsDataStore: SettingsDataStore,
-    private val userEventsStore: UserEventsStore
+    private val userEventsStore: UserEventsStore,
+    private val appCoroutineScope: CoroutineScope
 ) : BottomSheetDialog(context, R.style.FireDialog), CoroutineScope by MainScope() {
 
     var clearStarted: (() -> Unit) = {}
-    var clearComplete: (() -> Unit) = {}
     val ctaVisible: Boolean
         get() = daxCtaContainer?.isVisible == true
 
@@ -114,7 +115,7 @@ class FireDialog(
         cta.showCta(daxCtaContainer)
         ctaViewModel.onCtaShown(cta)
         onClearDataOptionsDismissed = {
-            GlobalScope.launch {
+            appCoroutineScope.launch {
                 ctaViewModel.onUserDismissedCta(cta)
             }
         }
@@ -132,7 +133,7 @@ class FireDialog(
         }
         clearStarted()
 
-        GlobalScope.launch {
+        appCoroutineScope.launch {
             userEventsStore.registerUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED)
             clearPersonalDataAction.clearTabsAndAllDataAsync(appInForeground = true, shouldFireDataClearPixel = true)
             clearPersonalDataAction.setAppUsedSinceLastClearFlag(false)
@@ -140,7 +141,12 @@ class FireDialog(
         }
     }
 
-    private fun animationEnabled() = settingsDataStore.fireAnimationEnabled
+    private fun animationEnabled() = settingsDataStore.fireAnimationEnabled && animatorDurationEnabled()
+
+    private fun animatorDurationEnabled(): Boolean {
+        val animatorScale = Settings.Global.getFloat(context.contentResolver, ANIMATOR_DURATION_SCALE, 1.0f)
+        return animatorScale != 0.0f
+    }
 
     private fun playAnimation() {
         window?.navigationBarColor = ContextCompat.getColor(context, R.color.black)

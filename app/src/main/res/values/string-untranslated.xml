@@ -15,25 +15,41 @@
   -->
 
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Email Autofill -->
+    <string name="settingsEmailAutofill">Email Autofill</string>
+    <string name="settingsEmailAutofillEnabledFor">Enabled for %1$s</string>
+    <string name="autofillSettingCancel">Cancel</string>
+    <string name="autofillSettingDisable">Disable</string>
+    <string name="aliasToClipboardMessage">New address copied to your clipboard</string>
+    <string name="autofillTooltipUseYourAlias">Use %1$s</string>
+    <string name="autofillTooltipUseYourAliasDescription">Blocks email trackers</string>
+    <string name="autofillTooltipGenerateAddress">Generate a Private Address</string>
+    <string name="autofillTooltipGenerateAddressDescription">Blocks email trackers and hides your address</string>
+    <string name="newEmailAliasMenuTitle">Create Duck Address</string>
 
-    <!-- Use Our App Flow -->
-    <string name="useOurAppDialogText">Did you know the Facebook app can make requests for data even when you\'re not using it?&lt;br/&gt;&lt;br/&gt;Replace the app with a home screen shortcut that opens Facebook in DuckDuckGo. Then delete the Facebook app.</string>
-    <string name="useOurAppDialogButtonText">Add Facebook Shortcut</string>
-    <string name="useOurAppDialogCancelButtonText">Not Now</string>
-    <string name="useOurAppNotificationTitle">Worried about Facebook tracking you?</string>
-    <string name="useOurAppNotificationDescription">Here\'s a simple way to reduce its reach.</string>
-    <string name="useOurAppShortcutAddedText">Success! %s has been added to your home screen.</string>
-    <string name="useOurAppDeletionDialogText">Checking your feed in DuckDuckGo is a great alternative to using the Facebook app!&lt;br/&gt;&lt;br/&gt;But if the Facebook app is on your phone, it can make requests for data even when you\'re not using it.&lt;br/&gt;&lt;br/&gt;Prevent this by deleting it now!</string>
 
-    <!-- Fireproof Websites snackbar -->
-    <string name="fireproofWebsiteRemovalConfirmation">Fireproofing removed for &lt;b>%s&lt;/b></string>
+    <!-- Precise Location Improvements -->
+    <string name="preciseLocationDDGDialogSubtitle">We only use your anonymous location to deliver better results, closer to you. You can always change your mind later.</string>
 
-    <!-- Bookmark Websites snackbar -->
-    <string name="bookmarkDeleteConfirmationMessage">Deleted &lt;b>%s&lt;/b></string>
+    <!-- Favorites -->
+    <string name="addFavoriteMenuTitle">Add Favorite</string>
+    <string name="favoriteAddedMessage">Favorite added</string>
+    <string name="bookmarkAddedMessage">Bookmark added</string>
+    <string name="savedSiteDialogTitleHint">Title</string>
+    <string name="savedSiteDialogUrlHint">URL</string>
+    <string name="savedSiteDialogTitleEdit">Edit</string>
+    <string name="bookmarksSectionTitle">Bookmarks</string>
+    <string name="favoritesSectionTitle">Favorites</string>
+    <string name="bookmarksEmptyHint">No bookmarks added yet</string>
+    <string name="favoritesEmptyHint">No favorites added yet</string>
 
-    <!-- Login detection enabled experiment -->
-    <string name="disableLoginDetectionDialogTitle">Disable Fireproof reminder when signing in to sites?</string>
-    <string name="disableLoginDetectionDialogDescription">You can change this preference anytime in Settings.</string>
-    <string name="disableLoginDetectionDialogPositive">DISABLE</string>
-    <string name="disableLoginDetectionDialogNegative">CANCEL</string>
+
+    <!-- Shortcut -->
+    <string name="shortcutAddedText">Success! %s has been added to your home screen.</string>
+
+    <!-- Opening app links -->
+    <string name="settingTitleOpenLinksInAssociatedApps">Open Links in Associated Apps</string>
+    <string name="settingSubtitleOpenLinksInAssociatedApps">Disable to prevent links from automatically opening in other installed apps.</string>
+    <string name="appLinkDialogTitle">Open in another app?</string>
+
 </resources>

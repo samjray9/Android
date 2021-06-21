@@ -20,12 +20,13 @@ import android.os.Build
 import com.duckduckgo.app.brokensite.model.BrokenSite
 import com.duckduckgo.app.browser.BuildConfig
 import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
+import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import com.duckduckgo.app.trackerdetection.db.TdsMetadataDao
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -39,10 +40,11 @@ class BrokenSiteSubmitter(
     private val tdsMetadataDao: TdsMetadataDao,
     private val globalPrivacyControl: GlobalPrivacyControl,
     private val pixel: Pixel,
+    private val appCoroutineScope: CoroutineScope
 ) : BrokenSiteSender {
 
     override fun submitBrokenSiteFeedback(brokenSite: BrokenSite) {
-        GlobalScope.launch(Dispatchers.IO) {
+        appCoroutineScope.launch(Dispatchers.IO) {
             val params = mapOf(
                 CATEGORY_KEY to brokenSite.category,
                 SITE_URL_KEY to brokenSite.siteUrl,
@@ -62,7 +64,7 @@ class BrokenSiteSubmitter(
                 SURROGATES_KEY to brokenSite.surrogates
             )
             runCatching {
-                pixel.fire(Pixel.PixelName.BROKEN_SITE_REPORT.pixelName, params, encodedParams)
+                pixel.fire(AppPixelName.BROKEN_SITE_REPORT.pixelName, params, encodedParams)
             }
                 .onSuccess { Timber.v("Feedback submission succeeded") }
                 .onFailure { Timber.w(it, "Feedback submission failed") }

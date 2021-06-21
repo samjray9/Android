@@ -19,6 +19,24 @@ package com.duckduckgo.app.browser.httpauth
 import android.webkit.WebView
 import android.webkit.WebViewDatabase
 import androidx.annotation.UiThread
+import androidx.annotation.WorkerThread
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
+import com.duckduckgo.app.di.AppCoroutineScope
+import com.duckduckgo.app.fire.DatabaseCleaner
+import com.duckduckgo.app.fire.DatabaseLocator
+import com.duckduckgo.app.global.DispatcherProvider
+import com.duckduckgo.di.scopes.AppObjectGraph
+import com.squareup.anvil.annotations.ContributesMultibinding
+import com.squareup.anvil.annotations.ContributesTo
+import dagger.Binds
+import dagger.Module
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Named
+import javax.inject.Singleton
 
 data class WebViewHttpAuthCredentials(val username: String, val password: String)
 
@@ -31,11 +49,34 @@ interface WebViewHttpAuthStore {
     fun getHttpAuthUsernamePassword(webView: WebView, host: String, realm: String): WebViewHttpAuthCredentials?
     @UiThread
     fun clearHttpAuthUsernamePassword(webView: WebView)
+    @WorkerThread
+    suspend fun cleanHttpAuthDatabase()
 }
 
-class RealWebViewHttpAuthStore(
-    private val webViewDatabase: WebViewDatabase
-) : WebViewHttpAuthStore {
+@ContributesMultibinding(
+    scope = AppObjectGraph::class,
+    boundType = LifecycleObserver::class
+)
+@Singleton
+class RealWebViewHttpAuthStore @Inject constructor(
+    private val webViewDatabase: WebViewDatabase,
+    private val databaseCleaner: DatabaseCleaner,
+    @Named("authDbLocator") private val authDatabaseLocator: DatabaseLocator,
+    private val dispatcherProvider: DispatcherProvider,
+    @AppCoroutineScope private val appCoroutineScope: CoroutineScope
+) : WebViewHttpAuthStore, LifecycleObserver {
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
+    fun onAppCreated() {
+        // API 28 seems to use WAL for the http_auth db and changing the journal mode does not seem
+        // to work properly
+        if (android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.P) return
+
+        appCoroutineScope.launch(dispatcherProvider.io()) {
+            databaseCleaner.changeJournalModeToDelete(authDatabaseLocator.getDatabasePath())
+        }
+    }
+
     override fun setHttpAuthUsernamePassword(webView: WebView, host: String, realm: String, username: String, password: String) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             webViewDatabase.setHttpAuthUsernamePassword(host, realm, username, password)
@@ -58,4 +99,18 @@ class RealWebViewHttpAuthStore(
     override fun clearHttpAuthUsernamePassword(webView: WebView) {
         webViewDatabase.clearHttpAuthUsernamePassword()
     }
+
+    override suspend fun cleanHttpAuthDatabase() {
+        databaseCleaner.cleanDatabase(authDatabaseLocator.getDatabasePath())
+    }
+}
+
+@Module
+@ContributesTo(AppObjectGraph::class)
+abstract class WebViewHttpAuthStoreModule {
+    @Binds
+    @Singleton
+    abstract fun bindWebViewHttpAuthStore(
+        realWebViewHttpAuthStore: RealWebViewHttpAuthStore
+    ): WebViewHttpAuthStore
 }

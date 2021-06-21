@@ -17,10 +17,10 @@
 package com.duckduckgo.app.di
 
 import android.content.Context
-import androidx.work.WorkManager
 import com.duckduckgo.app.autocomplete.api.AutoCompleteService
 import com.duckduckgo.app.brokensite.api.BrokenSiteSender
 import com.duckduckgo.app.brokensite.api.BrokenSiteSubmitter
+import com.duckduckgo.app.email.api.EmailService
 import com.duckduckgo.app.browser.useragent.UserAgentProvider
 import com.duckduckgo.app.feedback.api.FeedbackService
 import com.duckduckgo.app.feedback.api.FeedbackSubmitter
@@ -28,11 +28,8 @@ import com.duckduckgo.app.feedback.api.FireAndForgetFeedbackSubmitter
 import com.duckduckgo.app.feedback.api.SubReasonApiMapper
 import com.duckduckgo.app.global.AppUrl.Url
 import com.duckduckgo.app.global.api.*
-import com.duckduckgo.app.global.job.AppConfigurationSyncWorkRequestBuilder
 import com.duckduckgo.app.globalprivacycontrol.GlobalPrivacyControl
 import com.duckduckgo.app.httpsupgrade.api.HttpsUpgradeService
-import com.duckduckgo.app.job.AppConfigurationSyncer
-import com.duckduckgo.app.job.ConfigurationDownloader
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
@@ -43,6 +40,7 @@ import com.duckduckgo.app.trackerdetection.db.TdsMetadataDao
 import com.squareup.moshi.Moshi
 import dagger.Module
 import dagger.Provides
+import kotlinx.coroutines.CoroutineScope
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -132,6 +130,10 @@ class NetworkModule {
         retrofit.create(AutoCompleteService::class.java)
 
     @Provides
+    fun emailService(@Named("nonCaching") retrofit: Retrofit): EmailService =
+        retrofit.create(EmailService::class.java)
+
+    @Provides
     fun surrogatesService(@Named("api") retrofit: Retrofit): ResourceSurrogateListService =
         retrofit.create(ResourceSurrogateListService::class.java)
 
@@ -141,9 +143,10 @@ class NetworkModule {
         variantManager: VariantManager,
         tdsMetadataDao: TdsMetadataDao,
         pixel: Pixel,
-        globalPrivacyControl: GlobalPrivacyControl
+        globalPrivacyControl: GlobalPrivacyControl,
+        @AppCoroutineScope appCoroutineScope: CoroutineScope
     ): BrokenSiteSender =
-        BrokenSiteSubmitter(statisticsStore, variantManager, tdsMetadataDao, globalPrivacyControl, pixel)
+        BrokenSiteSubmitter(statisticsStore, variantManager, tdsMetadataDao, globalPrivacyControl, pixel, appCoroutineScope)
 
     @Provides
     fun surveyService(@Named("api") retrofit: Retrofit): SurveyService =
@@ -155,23 +158,14 @@ class NetworkModule {
         variantManager: VariantManager,
         apiKeyMapper: SubReasonApiMapper,
         statisticsStore: StatisticsDataStore,
-        pixel: Pixel
+        pixel: Pixel,
+        @AppCoroutineScope appCoroutineScope: CoroutineScope
     ): FeedbackSubmitter =
-        FireAndForgetFeedbackSubmitter(feedbackService, variantManager, apiKeyMapper, statisticsStore, pixel)
+        FireAndForgetFeedbackSubmitter(feedbackService, variantManager, apiKeyMapper, statisticsStore, pixel, appCoroutineScope)
 
     @Provides
     fun feedbackService(@Named("api") retrofit: Retrofit): FeedbackService =
         retrofit.create(FeedbackService::class.java)
-
-    @Provides
-    @Singleton
-    fun appConfigurationSyncer(
-        appConfigurationSyncWorkRequestBuilder: AppConfigurationSyncWorkRequestBuilder,
-        workManager: WorkManager,
-        appConfigurationDownloader: ConfigurationDownloader
-    ): AppConfigurationSyncer {
-        return AppConfigurationSyncer(appConfigurationSyncWorkRequestBuilder, workManager, appConfigurationDownloader)
-    }
 
     companion object {
         private const val CACHE_SIZE: Long = 10 * 1024 * 1024 // 10MB

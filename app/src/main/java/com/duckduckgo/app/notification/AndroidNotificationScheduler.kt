@@ -27,9 +27,12 @@ import com.duckduckgo.app.notification.model.Notification
 import com.duckduckgo.app.notification.model.PrivacyProtectionNotification
 import com.duckduckgo.app.notification.model.SchedulableNotification
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.NOTIFICATION_SHOWN
+import com.duckduckgo.app.pixels.AppPixelName.NOTIFICATION_SHOWN
+import com.duckduckgo.di.scopes.AppObjectGraph
+import com.squareup.anvil.annotations.ContributesMultibinding
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 // Please don't rename any Worker class name or class path
 // More information: https://craigrussell.io/2019/04/a-workmanager-pitfall-modifying-a-scheduled-worker/
@@ -53,17 +56,17 @@ class NotificationScheduler(
 
         when {
             privacyNotification.canShow() -> {
-                scheduleNotification(OneTimeWorkRequestBuilder<PrivacyNotificationWorker>(), 1, TimeUnit.DAYS, UNUSED_APP_WORK_REQUEST_TAG)
+                scheduleNotification(OneTimeWorkRequestBuilder<PrivacyNotificationWorker>(), PRIVACY_DELAY_DURATION_IN_DAYS, TimeUnit.DAYS, UNUSED_APP_WORK_REQUEST_TAG)
             }
             clearDataNotification.canShow() -> {
-                scheduleNotification(OneTimeWorkRequestBuilder<ClearDataNotificationWorker>(), 3, TimeUnit.DAYS, UNUSED_APP_WORK_REQUEST_TAG)
+                scheduleNotification(OneTimeWorkRequestBuilder<ClearDataNotificationWorker>(), CLEAR_DATA_DELAY_DURATION_IN_DAYS, TimeUnit.DAYS, UNUSED_APP_WORK_REQUEST_TAG)
             }
             else -> Timber.v("Notifications not enabled for this variant")
         }
     }
 
     private fun scheduleNotification(builder: OneTimeWorkRequest.Builder, duration: Long, unit: TimeUnit, tag: String) {
-        Timber.v("Scheduling notification")
+        Timber.v("Scheduling notification for $duration")
         val request = builder
             .addTag(tag)
             .setInitialDelay(duration, unit)
@@ -108,10 +111,13 @@ class NotificationScheduler(
 
     companion object {
         const val UNUSED_APP_WORK_REQUEST_TAG = "com.duckduckgo.notification.schedule"
+        const val CLEAR_DATA_DELAY_DURATION_IN_DAYS = 3L
+        const val PRIVACY_DELAY_DURATION_IN_DAYS = 1L
     }
 }
 
-class ClearDataNotificationWorkerInjectorPlugin(
+@ContributesMultibinding(AppObjectGraph::class)
+class ClearDataNotificationWorkerInjectorPlugin @Inject constructor(
     private val notificationManagerCompat: NotificationManagerCompat,
     private val notificationDao: NotificationDao,
     private val notificationFactory: NotificationFactory,
@@ -132,7 +138,8 @@ class ClearDataNotificationWorkerInjectorPlugin(
     }
 }
 
-class PrivacyNotificationWorkerInjectorPlugin(
+@ContributesMultibinding(AppObjectGraph::class)
+class PrivacyNotificationWorkerInjectorPlugin @Inject constructor(
     private val notificationManagerCompat: NotificationManagerCompat,
     private val notificationDao: NotificationDao,
     private val notificationFactory: NotificationFactory,

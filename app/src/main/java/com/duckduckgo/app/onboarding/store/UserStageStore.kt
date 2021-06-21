@@ -27,7 +27,10 @@ interface UserStageStore : LifecycleObserver {
     suspend fun moveToStage(appStage: AppStage)
 }
 
-class AppUserStageStore @Inject constructor(private val userStageDao: UserStageDao, private val dispatcher: DispatcherProvider) : UserStageStore {
+class AppUserStageStore @Inject constructor(
+    private val userStageDao: UserStageDao,
+    private val dispatcher: DispatcherProvider
+) : UserStageStore {
 
     override suspend fun getUserAppStage(): AppStage {
         return withContext(dispatcher.io()) {
@@ -41,8 +44,6 @@ class AppUserStageStore @Inject constructor(private val userStageDao: UserStageD
             val newAppStage = when (appStage) {
                 AppStage.NEW -> AppStage.DAX_ONBOARDING
                 AppStage.DAX_ONBOARDING -> AppStage.ESTABLISHED
-                AppStage.USE_OUR_APP_NOTIFICATION -> AppStage.ESTABLISHED
-                AppStage.USE_OUR_APP_ONBOARDING -> AppStage.ESTABLISHED
                 AppStage.ESTABLISHED -> AppStage.ESTABLISHED
             }
 
@@ -57,6 +58,7 @@ class AppUserStageStore @Inject constructor(private val userStageDao: UserStageD
     override suspend fun moveToStage(appStage: AppStage) {
         userStageDao.updateUserStage(appStage)
     }
+
 }
 
 suspend fun UserStageStore.isNewUser(): Boolean {
@@ -65,8 +67,4 @@ suspend fun UserStageStore.isNewUser(): Boolean {
 
 suspend fun UserStageStore.daxOnboardingActive(): Boolean {
     return this.getUserAppStage() == AppStage.DAX_ONBOARDING
-}
-
-suspend fun UserStageStore.useOurAppOnboarding(): Boolean {
-    return this.getUserAppStage() == AppStage.USE_OUR_APP_ONBOARDING
 }

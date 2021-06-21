@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -223,6 +207,16 @@
     <string name="noBookmarks">Még nincsenek könyvjelzők hozzáadva</string>
     <string name="bookmarkOverflowContentDescription">%1$s könyvjelző további lehetőségei</string>
     <string name="bookmarkEdited">Könyvjelző hozzáadva</string>
+    <string name="bookmarkDeleteConfirmationMessage">Törölve: &lt;b&gt;%1$s&lt;/b&gt;</string>
+    <string name="exportBookmarksMenu">Exportálás</string>
+    <string name="exportBookmarksEmpty">Nincsenek könyvjelzőid, semmi nem kerül exportálásra.</string>
+    <string name="exportBookmarksError">Nem sikerült exportálni egyetlen könyvjelzőt sem, valami hiba történt.</string>
+    <string name="exportBookmarksSuccess">Minden könyvjelző sikeresen exportálva.</string>
+    <string name="importBookmarksMenu">Importálás</string>
+    <string name="importBookmarksFileTitle">Válassz ki egy importálni kívánt könyvjelző fájlt.</string>
+    <string name="importBookmarksError">Nem sikerült importálni egyetlen könyvjelzőt sem, valami hiba történt.</string>
+    <string name="importBookmarksEmpty">A fájlnak nincs importálható könyvjelzője.</string>
+    <string name="importBookmarksSuccess">%1$d könyvjelző sikeresen importálva.</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Megerősítés</string>
@@ -484,6 +478,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Most nem</string>
     <string name="fireproofWebsiteItemsSectionTitle">Weboldalak</string>
     <string name="fireproofWebsiteToogleText">Kérdezze meg bejelentkezéskor</string>
+    <string name="disableLoginDetectionDialogTitle">Letiltod a tűzálló emlékeztetőt a weboldalakra történő bejelentkezéskor?</string>
+    <string name="disableLoginDetectionDialogDescription">Ezt a beállítást bármikor megváltoztathatod a Beállításokban.</string>
+    <string name="disableLoginDetectionDialogPositive">LETILT</string>
+    <string name="disableLoginDetectionDialogNegative">MÉGSEM</string>
+    <string name="fireproofWebsiteRemovalConfirmation">Tűzállóvá tétel törölve a következőhöz: &lt;b&gt;%1$s&lt;/b&gt;</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Tűz gomb animáció</string>
@@ -532,12 +531,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Nemzetközi adatvédelmi szabályozás (Global Privacy Control, GPC)</string>
     <string name="globalPrivacyControlDescription">
-        Az adataidnak nem lenne szabad eladónak lenniük. A DuckDuckGo-nál mi egyetértünk ezzel. Aktiváld a „Globális adatvédelmi szabályozás” (GPC) beállítást, és mi jelezzük a webhelyeknek, hogy te a következőket szeretnéd:&lt;br/&gt;&lt;br/&gt;• Ne adják el a személyes adataidat.&lt;br/&gt;• Korlátozzák a személyes adataid megosztását más vállalatokkal.
+        <![CDATA[A DuckDuckGo számos nyomkövetőt automatikusan blokkol. A Global Privacy Control (GPC, Globális Adatvédelmi Ellenőrzés) segítségével arra is megkérheted a részt vevő webhelyeket, hogy korlátozzák személyes adataid eladását vagy megosztását más vállalatokkal. <u><a href="">További részletek</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Nemzetközi adatvédelmi szabályozás (Global Privacy Control, GPC)</string>
     <string name="globalPrivacyControlToggle">Nemzetközi adatvédelmi szabályozás (Global Privacy Control, GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Mivel a Nemzetközi Adatvédelmi Szabályozás (Global Privacy Control, GPC) új szabvány, a legtöbb weboldal még nem fogja felismerni, de keményen dolgozunk azon, hogy világszerte elfogadottá váljon.</b> A weboldalaknak azonban csak olyan mértékben kell eleget tenniük a kérésnek, amennyire a hatályos törvények ezt megkövetelik tőlük.</string>
-    <string name="globalPrivacyControlLearnMore"><u>További tudnivalók</u></string>
     <string name="disabled">Letiltva</string>
     <string name="enabled">Engedélyezve</string>
 </resources>

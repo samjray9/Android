@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright (c) 2020 DuckDuckGo
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <string name="appName" translatable="false">DuckDuckGo</string>
@@ -223,6 +207,16 @@
     <string name="noBookmarks">Noch keine Lesezeichen hinzugefügt</string>
     <string name="bookmarkOverflowContentDescription">Mehr Optionen für Lesezeichen %1$s</string>
     <string name="bookmarkEdited">Lesezeichen hinzugefügt</string>
+    <string name="bookmarkDeleteConfirmationMessage">&lt;b&gt;%1$s&lt;/b&gt; wurde gelöscht</string>
+    <string name="exportBookmarksMenu">Exportieren</string>
+    <string name="exportBookmarksEmpty">Es wird nichts exportiert, da keine Lesezeichen für Sie vorliegen</string>
+    <string name="exportBookmarksError">Etwas ist schief gegangen und es konnten keine Lesezeichen exportiert werden</string>
+    <string name="exportBookmarksSuccess">Alle Lesezeichen wurden erfolgreich exportiert</string>
+    <string name="importBookmarksMenu">Importieren</string>
+    <string name="importBookmarksFileTitle">Wählen Sie aus, welche Lesezeichendatei Sie importieren möchten</string>
+    <string name="importBookmarksError">Etwas ist schief gegangen und es konnten keine Lesezeichen importiert werden</string>
+    <string name="importBookmarksEmpty">Diese Datei enthält keine Lesezeichen, die importiert werden können</string>
+    <string name="importBookmarksSuccess">%1$d Lesezeichen wurden erfolgreich importiert</string>
 
     <!-- Dialogs -->
     <string name="dialogConfirmTitle">Bestätigen</string>
@@ -484,6 +478,11 @@
     <string name="fireproofWebsiteLoginDialogNegative">Jetzt nicht</string>
     <string name="fireproofWebsiteItemsSectionTitle">Websites</string>
     <string name="fireproofWebsiteToogleText">Beim Anmelden fragen</string>
+    <string name="disableLoginDetectionDialogTitle">Erinnerung zur Feuerfest-Einstellung bei der Anmeldung auf Websites deaktivieren?</string>
+    <string name="disableLoginDetectionDialogDescription">Diese Auswahl kann in den Einstellungen jederzeit rückgängig gemacht werden.</string>
+    <string name="disableLoginDetectionDialogPositive">DEAKTIVIEREN</string>
+    <string name="disableLoginDetectionDialogNegative">ABBRECHEN</string>
+    <string name="fireproofWebsiteRemovalConfirmation">Feuerfest-Einstellung für &lt;b&gt;%1$s&lt;/b&gt; deaktiviert</string>
 
     <!-- Fire Animation settings -->
     <string name="settingsFireAnimation">Animation der Schaltfläche „Feuer“</string>
@@ -532,12 +531,10 @@
     <!--  Global Privacy Control-->
     <string name="globalPrivacyControlActivityTitle">Global Privacy Control (GPC)</string>
     <string name="globalPrivacyControlDescription">
-        Deine Daten sollten nicht zum Verkauf stehen. Und bei DuckDuckGo vertreten wir ebendiese Meinung. Aktiviere die Einstellung „Global Privacy Control“ (GPC) und wir teilen Websites Folgendes mit:&lt;br/&gt;&lt;br/&gt;• Personenbezogene Daten nicht verkaufen.&lt;br/&gt;• Personenbezogene Daten wenn möglich nicht an andere Unternehmen weiterleiten.
+        <![CDATA[DuckDuckGo blockiert viele Tracker automatisch. Mit Global Privacy Control (GPC) können Sie auch teilnehmende Websites bitten, das Verkaufen oder Teilen Ihrer personenbezogenen Daten mit anderen Unternehmen einzuschränken. <u><a href="">Mehr erfahren</a><u/>]]>
     </string>
     <string name="globalPrivacyControlSetting">Global Privacy Control (GPC)</string>
     <string name="globalPrivacyControlToggle">Global Privacy Control (GPC)</string>
-    <string name="globalPrivacyControlDescriptionLegal"><b>Global Privacy Control (GPC) ist noch ganz neu und die meisten Websites werden den Standard nicht sofort erkennen. Wir arbeiten aber darauf hin, dass der GPC-Standard bald weltweit akzeptiert wird.</b> Websites sind jedoch nur dann verpflichtet, den Aufruf zu beherzigen und umzusetzen, wenn die geltenden Gesetze sie dazu verpflichten.</string>
-    <string name="globalPrivacyControlLearnMore"><u>Mehr erfahren</u></string>
     <string name="disabled">Deaktiviert</string>
     <string name="enabled">Aktiviert</string>
 </resources>

@@ -18,15 +18,19 @@ package com.duckduckgo.app.settings
 
 import android.content.Context
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.Observer
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.blockingObserve
+import app.cash.turbine.test
+import com.duckduckgo.app.CoroutineTestRule
 import com.duckduckgo.app.browser.BuildConfig
 import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
+import com.duckduckgo.app.email.EmailManager
 import com.duckduckgo.app.fire.FireAnimationLoader
 import com.duckduckgo.app.global.DuckDuckGoTheme
 import com.duckduckgo.app.icon.api.AppIcon
+import com.duckduckgo.app.pixels.AppPixelName
+import com.duckduckgo.app.runBlocking
 import com.duckduckgo.app.settings.SettingsViewModel.Command
+import com.duckduckgo.app.settings.SettingsViewModel.EmailSetting
 import com.duckduckgo.app.settings.clear.ClearWhatOption.CLEAR_NONE
 import com.duckduckgo.app.settings.clear.ClearWhenOption.APP_EXIT_ONLY
 import com.duckduckgo.app.settings.clear.FireAnimation
@@ -35,13 +39,19 @@ import com.duckduckgo.app.statistics.Variant
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.nhaarman.mockitokotlin2.*
+import kotlinx.android.synthetic.main.content_settings_general.view.*
+import kotlinx.android.synthetic.main.settings_automatically_clear_what_fragment.view.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
+import kotlin.time.ExperimentalTime
 
+@ExperimentalCoroutinesApi
+@ExperimentalTime
 class SettingsViewModelTest {
 
     @get:Rule
@@ -51,9 +61,6 @@ class SettingsViewModelTest {
     private lateinit var testee: SettingsViewModel
 
     private lateinit var context: Context
-
-    @Mock
-    private lateinit var commandObserver: Observer<Command>
 
     @Mock
     private lateinit var mockAppSettingsDataStore: SettingsDataStore
@@ -70,17 +77,19 @@ class SettingsViewModelTest {
     @Mock
     private lateinit var mockFireAnimationLoader: FireAnimationLoader
 
-    private lateinit var commandCaptor: KArgumentCaptor<Command>
+    @Mock
+    private lateinit var mockEmailManager: EmailManager
+
+    @get:Rule
+    val coroutineTestRule: CoroutineTestRule = CoroutineTestRule()
 
     @Before
     fun before() {
-        MockitoAnnotations.initMocks(this)
+        MockitoAnnotations.openMocks(this)
 
         context = InstrumentationRegistry.getInstrumentation().targetContext
-        commandCaptor = argumentCaptor()
 
-        testee = SettingsViewModel(mockAppSettingsDataStore, mockDefaultBrowserDetector, mockVariantManager, mockFireAnimationLoader, mockPixel)
-        testee.command.observeForever(commandObserver)
+        testee = SettingsViewModel(mockAppSettingsDataStore, mockDefaultBrowserDetector, mockVariantManager, mockEmailManager, mockFireAnimationLoader, mockPixel)
 
         whenever(mockAppSettingsDataStore.automaticallyClearWhenOption).thenReturn(APP_EXIT_ONLY)
         whenever(mockAppSettingsDataStore.automaticallyClearWhatOption).thenReturn(CLEAR_NONE)
@@ -93,66 +102,81 @@ class SettingsViewModelTest {
     @Test
     fun whenViewModelInitialisedThenPixelIsFired() {
         testee // init
-        verify(mockPixel).fire(Pixel.PixelName.SETTINGS_OPENED)
+        verify(mockPixel).fire(AppPixelName.SETTINGS_OPENED)
     }
 
     @Test
-    fun whenStartNotCalledYetThenViewStateInitialisedDefaultValues() {
-        assertNotNull(testee.viewState)
+    fun whenStartNotCalledYetThenViewStateInitialisedDefaultValues() = coroutineTestRule.runBlocking {
+        testee.viewState().test {
+            val value = expectItem()
+            assertTrue(value.loading)
+            assertEquals("", value.version)
+            assertTrue(value.autoCompleteSuggestionsEnabled)
+            assertFalse(value.showDefaultBrowserSetting)
+            assertFalse(value.isAppDefaultBrowser)
 
-        val value = latestViewState()
-        assertTrue(value.loading)
-        assertEquals("", value.version)
-        assertTrue(value.autoCompleteSuggestionsEnabled)
-        assertFalse(value.showDefaultBrowserSetting)
-        assertFalse(value.isAppDefaultBrowser)
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenStartCalledThenLoadingSetToFalse() {
+    fun whenStartCalledThenLoadingSetToFalse() = coroutineTestRule.runBlocking {
         testee.start()
-        val value = latestViewState()
-        assertEquals(false, value.loading)
+        testee.viewState().test {
+            val value = expectItem()
+            assertEquals(false, value.loading)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenStartCalledThenVersionSetCorrectly() {
+    fun whenStartCalledThenVersionSetCorrectly() = coroutineTestRule.runBlocking {
         testee.start()
-        val value = latestViewState()
-        val expectedStartString = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
-        assertTrue(value.version.startsWith(expectedStartString))
+        testee.viewState().test {
+
+            val value = expectItem()
+            val expectedStartString = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+            assertTrue(value.version.startsWith(expectedStartString))
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenLightThemeToggledOnThenDataStoreIsUpdatedAndUpdateThemeCommandIsSent() {
-        testee.onLightThemeToggled(true)
-        verify(mockAppSettingsDataStore).theme = DuckDuckGoTheme.LIGHT
+    fun whenLightThemeToggledOnThenDataStoreIsUpdatedAndUpdateThemeCommandIsSent() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.onLightThemeToggled(true)
+            verify(mockAppSettingsDataStore).theme = DuckDuckGoTheme.LIGHT
 
-        testee.command.blockingObserve()
-        verify(commandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
-        assertEquals(Command.UpdateTheme, commandCaptor.firstValue)
+            assertEquals(Command.UpdateTheme, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
     fun whenLightThemeToggledOnThenLighThemePixelIsSent() {
         testee.onLightThemeToggled(true)
-        verify(mockPixel).fire(Pixel.PixelName.SETTINGS_THEME_TOGGLED_LIGHT)
+        verify(mockPixel).fire(AppPixelName.SETTINGS_THEME_TOGGLED_LIGHT)
     }
 
     @Test
-    fun whenLightThemeTogglesOffThenDataStoreIsUpdatedAndUpdateThemeCommandIsSent() {
-        testee.onLightThemeToggled(false)
-        verify(mockAppSettingsDataStore).theme = DuckDuckGoTheme.DARK
+    fun whenLightThemeTogglesOffThenDataStoreIsUpdatedAndUpdateThemeCommandIsSent() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.onLightThemeToggled(false)
+            verify(mockAppSettingsDataStore).theme = DuckDuckGoTheme.DARK
 
-        testee.command.blockingObserve()
-        verify(commandObserver, atLeastOnce()).onChanged(commandCaptor.capture())
-        assertEquals(Command.UpdateTheme, commandCaptor.firstValue)
+            assertEquals(Command.UpdateTheme, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
     fun whenLightThemeToggledOffThenDarkThemePixelIsSent() {
         testee.onLightThemeToggled(false)
-        verify(mockPixel).fire(Pixel.PixelName.SETTINGS_THEME_TOGGLED_DARK)
+        verify(mockPixel).fire(AppPixelName.SETTINGS_THEME_TOGGLED_DARK)
     }
 
     @Test
@@ -168,93 +192,151 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun whenLeaveFeedBackRequestedThenCommandIsLaunchFeedback() {
-        testee.userRequestedToSendFeedback()
-        testee.command.blockingObserve()
-        verify(commandObserver).onChanged(commandCaptor.capture())
-        assertEquals(Command.LaunchFeedback, commandCaptor.firstValue)
+    fun whenAppLinksSwitchedOnThenDataStoreIsUpdated() {
+        testee.onAppLinksSettingChanged(true)
+        verify(mockAppSettingsDataStore).appLinksEnabled = true
     }
 
     @Test
-    fun whenDefaultBrowserAppAlreadySetToOursThenIsDefaultBrowserFlagIsTrue() {
+    fun whenAppLinksSwitchedOffThenDataStoreIsUpdated() {
+        testee.onAppLinksSettingChanged(false)
+        verify(mockAppSettingsDataStore).appLinksEnabled = false
+    }
+
+    @Test
+    fun whenLeaveFeedBackRequestedThenCommandIsLaunchFeedback() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.userRequestedToSendFeedback()
+
+            assertEquals(Command.LaunchFeedback, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun whenDefaultBrowserAppAlreadySetToOursThenIsDefaultBrowserFlagIsTrue() = coroutineTestRule.runBlocking {
         whenever(mockDefaultBrowserDetector.isDefaultBrowser()).thenReturn(true)
         testee.start()
-        val viewState = latestViewState()
-        assertTrue(viewState.isAppDefaultBrowser)
+
+        testee.viewState().test {
+            assertTrue(expectItem().isAppDefaultBrowser)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenDefaultBrowserAppNotSetToOursThenIsDefaultBrowserFlagIsFalse() {
-        whenever(mockDefaultBrowserDetector.isDefaultBrowser()).thenReturn(false)
-        testee.start()
-        val viewState = latestViewState()
-        assertFalse(viewState.isAppDefaultBrowser)
+    fun whenDefaultBrowserAppNotSetToOursThenIsDefaultBrowserFlagIsFalse() = coroutineTestRule.runBlocking {
+        testee.viewState().test {
+            whenever(mockDefaultBrowserDetector.isDefaultBrowser()).thenReturn(false)
+            testee.start()
+
+            assertFalse(expectItem().isAppDefaultBrowser)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenBrowserDetectorIndicatesDefaultCannotBeSetThenFlagToShowSettingIsFalse() {
-        whenever(mockDefaultBrowserDetector.deviceSupportsDefaultBrowserConfiguration()).thenReturn(false)
-        testee.start()
-        assertFalse(latestViewState().showDefaultBrowserSetting)
+    fun whenBrowserDetectorIndicatesDefaultCannotBeSetThenFlagToShowSettingIsFalse() = coroutineTestRule.runBlocking {
+        testee.viewState().test {
+            whenever(mockDefaultBrowserDetector.deviceSupportsDefaultBrowserConfiguration()).thenReturn(false)
+            testee.start()
+
+            assertFalse(expectItem().showDefaultBrowserSetting)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenBrowserDetectorIndicatesDefaultCanBeSetThenFlagToShowSettingIsTrue() {
+    fun whenBrowserDetectorIndicatesDefaultCanBeSetThenFlagToShowSettingIsTrue() = coroutineTestRule.runBlocking {
         whenever(mockDefaultBrowserDetector.deviceSupportsDefaultBrowserConfiguration()).thenReturn(true)
         testee.start()
-        assertTrue(latestViewState().showDefaultBrowserSetting)
+        testee.viewState().test {
+            assertTrue(expectItem().showDefaultBrowserSetting)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenWhitelistSelectedThenPixelIsSentAndWhitelistLaunched() {
-        testee.onManageWhitelistSelected()
-        verify(mockPixel).fire(Pixel.PixelName.SETTINGS_MANAGE_WHITELIST)
-        verify(commandObserver).onChanged(Command.LaunchWhitelist)
+    fun whenWhitelistSelectedThenPixelIsSentAndWhitelistLaunched() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.onManageWhitelistSelected()
+
+            verify(mockPixel).fire(AppPixelName.SETTINGS_MANAGE_WHITELIST)
+            assertEquals(Command.LaunchWhitelist, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenVariantIsEmptyThenEmptyVariantIncludedInSettings() {
+    fun whenVariantIsEmptyThenEmptyVariantIncludedInSettings() = coroutineTestRule.runBlocking {
         testee.start()
-        val expectedStartString = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
-        assertEquals(expectedStartString, latestViewState().version)
+        testee.viewState().test {
+            val expectedStartString = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+            assertEquals(expectedStartString, expectItem().version)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenVariantIsSetThenVariantKeyIncludedInSettings() {
+    fun whenVariantIsSetThenVariantKeyIncludedInSettings() = coroutineTestRule.runBlocking {
         whenever(mockVariantManager.getVariant()).thenReturn(Variant("ab", filterBy = { true }))
         testee.start()
-        val expectedStartString = "${BuildConfig.VERSION_NAME} ab (${BuildConfig.VERSION_CODE})"
-        assertEquals(expectedStartString, latestViewState().version)
+
+        testee.viewState().test {
+            val expectedStartString = "${BuildConfig.VERSION_NAME} ab (${BuildConfig.VERSION_CODE})"
+            assertEquals(expectedStartString, expectItem().version)
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenChangeIconRequestedThenCommandIsChangeIcon() {
-        testee.userRequestedToChangeIcon()
-        testee.command.blockingObserve()
-        verify(commandObserver).onChanged(commandCaptor.capture())
-        assertEquals(Command.LaunchAppIcon, commandCaptor.firstValue)
+    fun whenChangeIconRequestedThenCommandIsChangeIcon() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.userRequestedToChangeIcon()
+
+            assertEquals(Command.LaunchAppIcon, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
-    fun whenFireAnimationSettingClickedThenCommandIsLaunchFireAnimationSettings() {
-        testee.userRequestedToChangeFireAnimation()
-        testee.command.blockingObserve()
-        verify(commandObserver).onChanged(commandCaptor.capture())
-        assertEquals(Command.LaunchFireAnimationSettings, commandCaptor.firstValue)
+    fun whenFireAnimationSettingClickedThenCommandIsLaunchFireAnimationSettings() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.userRequestedToChangeFireAnimation()
+
+            assertEquals(Command.LaunchFireAnimationSettings(FireAnimation.HeroFire), expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
     @Test
     fun whenFireAnimationSettingClickedThenPixelSent() {
         testee.userRequestedToChangeFireAnimation()
 
-        verify(mockPixel).fire(Pixel.PixelName.FIRE_ANIMATION_SETTINGS_OPENED)
+        verify(mockPixel).fire(AppPixelName.FIRE_ANIMATION_SETTINGS_OPENED)
     }
 
     @Test
-    fun whenNewFireAnimationSelectedThenUpdateViewState() {
-        testee.onFireAnimationSelected(FireAnimation.HeroWater)
+    fun whenNewFireAnimationSelectedThenUpdateViewState() = coroutineTestRule.runBlocking {
+        val expectedAnimation = FireAnimation.HeroAbstract
+        testee.onFireAnimationSelected(expectedAnimation)
 
-        assertEquals(FireAnimation.HeroWater, latestViewState().selectedFireAnimation)
+        testee.viewState().test {
+            assertEquals(expectedAnimation, expectItem().selectedFireAnimation)
+
+            cancelAndConsumeRemainingEvents()
+        }
+
     }
 
     @Test
@@ -276,7 +358,7 @@ class SettingsViewModelTest {
         testee.onFireAnimationSelected(FireAnimation.HeroWater)
 
         verify(mockPixel).fire(
-            Pixel.PixelName.FIRE_ANIMATION_NEW_SELECTED,
+            AppPixelName.FIRE_ANIMATION_NEW_SELECTED,
             mapOf(Pixel.PixelParameter.FIRE_ANIMATION to Pixel.PixelValues.FIRE_ANIMATION_WHIRLPOOL)
         )
     }
@@ -288,20 +370,121 @@ class SettingsViewModelTest {
         testee.onFireAnimationSelected(FireAnimation.HeroFire)
 
         verify(mockPixel, times(0)).fire(
-            Pixel.PixelName.FIRE_ANIMATION_NEW_SELECTED,
+            AppPixelName.FIRE_ANIMATION_NEW_SELECTED,
             mapOf(Pixel.PixelParameter.FIRE_ANIMATION to Pixel.PixelValues.FIRE_ANIMATION_INFERNO)
         )
     }
 
     @Test
-    fun whenOnGlobalPrivacyControlClickedThenCommandIsLaunchGlobalPrivacyControl() {
-        testee.onGlobalPrivacyControlClicked()
-        testee.command.blockingObserve()
-        verify(commandObserver).onChanged(commandCaptor.capture())
-        assertEquals(Command.LaunchGlobalPrivacyControl, commandCaptor.firstValue)
+    fun whenOnGlobalPrivacyControlClickedThenCommandIsLaunchGlobalPrivacyControl() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.onGlobalPrivacyControlClicked()
+
+            assertEquals(Command.LaunchGlobalPrivacyControl, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
     }
 
-    private fun latestViewState() = testee.viewState.value!!
+    @Test
+    fun whenUserNotSignedInOnEmailThenEmailSettingIsOff() = coroutineTestRule.runBlocking {
+        testee.viewState().test {
+            givenUserIsNotSignedIn()
+            testee.start()
+
+            assert(expectItem().emailSetting is EmailSetting.EmailSettingOff)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun whenUserSignedInOnEmailAndEmailAddressIsNotNullThenEmailSettingIsOn() = coroutineTestRule.runBlocking {
+        givenUserIsSignedInAndHasAliasAvailable()
+        testee.start()
+
+        testee.viewState().test {
+            assertTrue(expectItem().emailSetting is EmailSetting.EmailSettingOn)
+
+            cancelAndConsumeRemainingEvents()
+        }
+
+    }
+
+    @Test
+    fun whenUserSignedInOnEmailAndEmailAddressIsNullThenEmailSettingIsOff() = coroutineTestRule.runBlocking {
+        whenever(mockEmailManager.getEmailAddress()).thenReturn(null)
+        whenever(mockEmailManager.isSignedIn()).thenReturn(true)
+        testee.start()
+
+        testee.viewState().test {
+            assert(expectItem().emailSetting is EmailSetting.EmailSettingOff)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun whenOnEmailLogoutThenSignOutIsCalled() {
+        testee.onEmailLogout()
+
+        verify(mockEmailManager).signOut()
+    }
+
+    @Test
+    fun whenOnEmailLogoutThenEmailSettingIsOff() = coroutineTestRule.runBlocking {
+        testee.viewState().test {
+            testee.onEmailLogout()
+
+            assert(expectItem().emailSetting is EmailSetting.EmailSettingOff)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun whenOnEmailSettingClickedAndUserIsSignedInThenLaunchEmailDialogCommandSent() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            givenUserIsSignedInAndHasAliasAvailable()
+
+            testee.onEmailSettingClicked()
+
+            assertEquals(Command.LaunchEmailDialog, expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun whenOnAutomaticallyClearWhatClickedEmitCommandShowClearWhatDialog() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.onAutomaticallyClearWhatClicked()
+
+            assertEquals(Command.ShowClearWhatDialog(CLEAR_NONE), expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun whenOnAutomaticallyClearWhenClickedEmitCommandShowClearWhenDialog() = coroutineTestRule.runBlocking {
+        testee.commands().test {
+            testee.onAutomaticallyClearWhenClicked()
+
+            assertEquals(Command.ShowClearWhenDialog(APP_EXIT_ONLY), expectItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    private fun givenUserIsSignedInAndHasAliasAvailable() {
+        whenever(mockEmailManager.getEmailAddress()).thenReturn("test@duck.com")
+        whenever(mockEmailManager.isSignedIn()).thenReturn(true)
+    }
+
+    private fun givenUserIsNotSignedIn() {
+        whenever(mockEmailManager.isSignedIn()).thenReturn(false)
+    }
 
     private fun givenSelectedFireAnimation(fireAnimation: FireAnimation) {
         whenever(mockAppSettingsDataStore.selectedFireAnimation).thenReturn(fireAnimation)

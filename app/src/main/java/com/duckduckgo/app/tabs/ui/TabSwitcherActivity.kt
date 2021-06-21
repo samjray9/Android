@@ -31,24 +31,23 @@ import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.browser.favicon.FaviconManager
 import com.duckduckgo.app.browser.tabpreview.WebViewPreviewPersister
 import com.duckduckgo.app.cta.ui.CtaViewModel
+import com.duckduckgo.app.di.AppCoroutineScope
 import com.duckduckgo.app.global.DuckDuckGoActivity
 import com.duckduckgo.app.global.events.db.UserEventsStore
-import com.duckduckgo.app.global.view.ClearPersonalDataAction
+import com.duckduckgo.app.global.view.ClearDataAction
 import com.duckduckgo.app.global.view.FireDialog
+import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.settings.SettingsActivity
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.ui.TabSwitcherViewModel.Command
 import com.duckduckgo.app.tabs.ui.TabSwitcherViewModel.Command.Close
-import com.duckduckgo.app.tabs.ui.TabSwitcherViewModel.Command.DisplayMessage
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import org.jetbrains.anko.contentView
-import org.jetbrains.anko.longToast
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 
@@ -58,7 +57,7 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
         get() = SupervisorJob() + Dispatchers.Main
 
     @Inject
-    lateinit var clearPersonalDataAction: ClearPersonalDataAction
+    lateinit var clearPersonalDataAction: ClearDataAction
 
     @Inject
     lateinit var gridViewColumnCalculator: GridViewColumnCalculator
@@ -77,6 +76,10 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
 
     @Inject
     lateinit var userEventsStore: UserEventsStore
+
+    @Inject
+    @AppCoroutineScope
+    lateinit var appCoroutineScope: CoroutineScope
 
     private val viewModel: TabSwitcherViewModel by bindViewModel()
 
@@ -172,7 +175,6 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
 
     private fun processCommand(command: Command?) {
         when (command) {
-            is DisplayMessage -> applicationContext?.longToast(command.messageId)
             is Close -> finishAfterTransition()
         }
     }
@@ -193,16 +195,16 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
     }
 
     private fun onFire() {
-        pixel.fire(Pixel.PixelName.FORGET_ALL_PRESSED_TABSWITCHING)
+        pixel.fire(AppPixelName.FORGET_ALL_PRESSED_TABSWITCHING)
         val dialog = FireDialog(
             context = this,
             clearPersonalDataAction = clearPersonalDataAction,
             ctaViewModel = ctaViewModel,
             pixel = pixel,
             settingsDataStore = settingsDataStore,
-            userEventsStore = userEventsStore
+            userEventsStore = userEventsStore,
+            appCoroutineScope = appCoroutineScope
         )
-        dialog.clearComplete = { viewModel.onClearComplete() }
         dialog.show()
     }
 
@@ -227,11 +229,7 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
     }
 
     private fun onDeletableTab(tab: TabEntity) {
-        Snackbar.make(
-            contentView!!,
-            getString(R.string.tabClosed),
-            Snackbar.LENGTH_LONG
-        )
+        Snackbar.make(toolbar, getString(R.string.tabClosed), Snackbar.LENGTH_LONG)
             .setDuration(3500) // 3.5 seconds
             .setAction(R.string.tabClosedUndo) {
                 // noop, handled in onDismissed callback
@@ -244,7 +242,8 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
                         BaseTransientBottomBar.BaseCallback.DISMISS_EVENT_SWIPE,
                         BaseTransientBottomBar.BaseCallback.DISMISS_EVENT_TIMEOUT -> launch { viewModel.purgeDeletableTabs() }
                         BaseTransientBottomBar.BaseCallback.DISMISS_EVENT_CONSECUTIVE,
-                        BaseTransientBottomBar.BaseCallback.DISMISS_EVENT_MANUAL -> { /* noop */ }
+                        BaseTransientBottomBar.BaseCallback.DISMISS_EVENT_MANUAL -> { /* noop */
+                        }
                     }
                 }
             })

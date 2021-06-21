@@ -20,7 +20,7 @@ import com.duckduckgo.app.global.exception.UncaughtExceptionEntity
 import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
 import com.duckduckgo.app.global.exception.UncaughtExceptionSource.*
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.*
+import com.duckduckgo.app.statistics.pixels.Pixel.StatisticsPixelName.*
 import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.COUNT
 import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.EXCEPTION_APP_VERSION
 import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.EXCEPTION_MESSAGE
@@ -118,6 +118,7 @@ class OfflinePixelSender @Inject constructor(
         return when (exception.exceptionSource) {
             GLOBAL -> APPLICATION_CRASH_GLOBAL
             SHOULD_INTERCEPT_REQUEST -> APPLICATION_CRASH_WEBVIEW_SHOULD_INTERCEPT
+            SHOULD_INTERCEPT_REQUEST_FROM_SERVICE_WORKER -> APPLICATION_CRASH_WEBVIEW_SHOULD_INTERCEPT_SERVICE_WORKER
             ON_PAGE_STARTED -> APPLICATION_CRASH_WEBVIEW_PAGE_STARTED
             ON_PAGE_FINISHED -> APPLICATION_CRASH_WEBVIEW_PAGE_FINISHED
             SHOULD_OVERRIDE_REQUEST -> APPLICATION_CRASH_WEBVIEW_OVERRIDE_REQUEST

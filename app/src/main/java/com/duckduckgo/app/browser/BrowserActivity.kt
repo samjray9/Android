@@ -21,6 +21,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.Intent.EXTRA_TEXT
 import android.os.Bundle
+import android.os.Handler
 import android.os.Message
 import android.view.View
 import android.widget.Toast
@@ -35,6 +36,7 @@ import com.duckduckgo.app.browser.rating.ui.GiveFeedbackDialogFragment
 import com.duckduckgo.app.browser.rating.ui.RateAppDialogFragment
 import com.duckduckgo.app.browser.shortcut.ShortcutBuilder
 import com.duckduckgo.app.cta.ui.CtaViewModel
+import com.duckduckgo.app.di.AppCoroutineScope
 import com.duckduckgo.app.feedback.ui.common.FeedbackActivity
 import com.duckduckgo.app.fire.DataClearer
 import com.duckduckgo.app.fire.DataClearerForegroundAppRestartPixel
@@ -42,28 +44,29 @@ import com.duckduckgo.app.global.ApplicationClearDataState
 import com.duckduckgo.app.global.DuckDuckGoActivity
 import com.duckduckgo.app.global.events.db.UserEventsStore
 import com.duckduckgo.app.global.intentText
+import com.duckduckgo.app.global.sanitize
 import com.duckduckgo.app.global.view.*
 import com.duckduckgo.app.location.ui.LocationPermissionsActivity
 import com.duckduckgo.app.onboarding.ui.page.DefaultBrowserPage
+import com.duckduckgo.app.pixels.AppPixelName
+import com.duckduckgo.app.pixels.AppPixelName.FIRE_DIALOG_CANCEL
+import com.duckduckgo.app.pixels.AppPixelName.FIRE_DIALOG_PROMOTED_CANCEL
 import com.duckduckgo.app.playstore.PlayStoreUtils
 import com.duckduckgo.app.privacy.ui.PrivacyDashboardActivity
 import com.duckduckgo.app.settings.SettingsActivity
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.FIRE_DIALOG_CANCEL
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.FIRE_DIALOG_PROMOTED_CANCEL
 import com.duckduckgo.app.tabs.model.TabEntity
 import kotlinx.android.synthetic.main.activity_browser.*
 import kotlinx.android.synthetic.main.include_omnibar_toolbar_mockup.*
 import kotlinx.coroutines.*
-import org.jetbrains.anko.longToast
 import timber.log.Timber
 import javax.inject.Inject
 
 class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
 
     @Inject
-    lateinit var clearPersonalDataAction: ClearPersonalDataAction
+    lateinit var clearPersonalDataAction: ClearDataAction
 
     @Inject
     lateinit var dataClearer: DataClearer
@@ -86,6 +89,10 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     @Inject
     lateinit var userEventsStore: UserEventsStore
 
+    @Inject
+    @AppCoroutineScope
+    lateinit var appCoroutineScope: CoroutineScope
+
     private var currentTab: BrowserTabFragment? = null
 
     private val viewModel: BrowserViewModel by bindViewModel()
@@ -101,6 +108,7 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     @SuppressLint("MissingSuperCall")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.daggerInject()
+        intent?.sanitize()
         Timber.i("onCreate called. freshAppLaunch: ${dataClearer.isFreshAppLaunch}, savedInstanceState: $savedInstanceState")
         dataClearerForegroundAppRestartPixel.registerIntent(intent)
         renderer = BrowserStateRenderer()
@@ -131,6 +139,9 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         Timber.i("onNewIntent: $intent")
+
+        intent?.sanitize()
+
         dataClearerForegroundAppRestartPixel.registerIntent(intent)
 
         if (dataClearer.dataClearerState.value == ApplicationClearDataState.FINISHED) {
@@ -202,7 +213,7 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
         if (intent.getBooleanExtra(PERFORM_FIRE_ON_ENTRY_EXTRA, false)) {
 
             Timber.i("Clearing everything as a result of $PERFORM_FIRE_ON_ENTRY_EXTRA flag being set")
-            GlobalScope.launch {
+            appCoroutineScope.launch {
                 clearPersonalDataAction.clearTabsAndAllDataAsync(appInForeground = true, shouldFireDataClearPixel = true)
                 clearPersonalDataAction.setAppUsedSinceLastClearFlag(false)
                 clearPersonalDataAction.killAndRestartProcess(notifyDataCleared = false)
@@ -282,7 +293,6 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
         when (command) {
             is Query -> currentTab?.submitQuery(command.query)
             is Refresh -> currentTab?.onRefreshRequested()
-            is Command.DisplayMessage -> applicationContext?.longToast(command.messageId)
             is Command.LaunchPlayStore -> launchPlayStore()
             is Command.ShowAppEnjoymentPrompt -> showAppEnjoymentPrompt(AppEnjoymentDialogFragment.create(command.promptCount, viewModel))
             is Command.ShowAppRatingPrompt -> showAppEnjoymentPrompt(RateAppDialogFragment.create(command.promptCount, viewModel))
@@ -302,19 +312,19 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     }
 
     fun launchFire() {
-        pixel.fire(Pixel.PixelName.FORGET_ALL_PRESSED_BROWSING)
+        pixel.fire(AppPixelName.FORGET_ALL_PRESSED_BROWSING)
         val dialog = FireDialog(
             context = this,
             clearPersonalDataAction = clearPersonalDataAction,
             ctaViewModel = ctaViewModel,
             pixel = pixel,
             settingsDataStore = settingsDataStore,
-            userEventsStore = userEventsStore
+            userEventsStore = userEventsStore,
+            appCoroutineScope = appCoroutineScope
         )
         dialog.clearStarted = {
             removeObservers()
         }
-        dialog.clearComplete = { viewModel.onClearComplete() }
         dialog.setOnShowListener { currentTab?.onFireDialogVisibilityChanged(isVisible = true) }
         dialog.setOnCancelListener {
             pixel.fire(if (dialog.ctaVisible) FIRE_DIALOG_PROMOTED_CANCEL else FIRE_DIALOG_CANCEL)
@@ -373,7 +383,13 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     }
 
     private fun hideMockupOmnibar() {
-        appBarLayoutMockup.visibility = View.GONE
+        // Delaying this code to avoid race condition when fragment and activity recreated
+        Handler().postDelayed(
+            {
+                appBarLayoutMockup?.visibility = View.GONE
+            },
+            300
+        )
     }
 
     companion object {

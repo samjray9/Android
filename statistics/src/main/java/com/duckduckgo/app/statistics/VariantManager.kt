@@ -28,9 +28,7 @@ interface VariantManager {
 
     // variant-dependant features listed here
     sealed class VariantFeature {
-        object SerpHeaderQueryReplacement : VariantFeature()
-        object SerpHeaderRemoval : VariantFeature()
-        object LoginDetectionEnabled : VariantFeature()
+
     }
 
     companion object {
@@ -45,15 +43,6 @@ interface VariantManager {
             // the future if we can filter by app version
             Variant(key = "sc", weight = 0.0, features = emptyList(), filterBy = { isSerpRegionToggleCountry() }),
             Variant(key = "se", weight = 0.0, features = emptyList(), filterBy = { isSerpRegionToggleCountry() }),
-
-            // Single Search Bar Experiments
-            Variant(key = "zg", weight = 0.0, features = emptyList(), filterBy = { noFilter() }),
-            Variant(key = "zh", weight = 0.0, features = listOf(VariantFeature.SerpHeaderQueryReplacement), filterBy = { noFilter() }),
-            Variant(key = "zi", weight = 0.0, features = listOf(VariantFeature.SerpHeaderRemoval), filterBy = { noFilter() }),
-
-            // Fireproof login Experiment
-            Variant(key = "zq", weight = 1.0, features = emptyList(), filterBy = { isEnglishLocale() }),
-            Variant(key = "zw", weight = 1.0, features = listOf(VariantFeature.LoginDetectionEnabled), filterBy = { isEnglishLocale() }),
         )
 
         val REFERRER_VARIANTS = listOf(
@@ -98,8 +87,6 @@ interface VariantManager {
 
     fun updateAppReferrerVariant(variant: String)
 }
-
-fun VariantManager.loginDetectionExperimentEnabled() = this.getVariant().hasFeature(VariantManager.VariantFeature.LoginDetectionEnabled)
 
 class ExperimentationVariantManager(
     private val store: StatisticsDataStore,

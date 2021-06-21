@@ -47,7 +47,9 @@ interface WebViewClientListener {
     fun goFullScreen(view: View)
     fun exitFullScreen()
     fun showFileChooser(filePathCallback: ValueCallback<Array<Uri>>, fileChooserParams: WebChromeClient.FileChooserParams)
-    fun externalAppLinkClicked(appLink: SpecialUrlDetector.UrlType.IntentType)
+    fun handleAppLink(appLink: SpecialUrlDetector.UrlType.AppLink, isRedirect: Boolean, isForMainFrame: Boolean): Boolean
+    fun resetAppLinkState()
+    fun handleNonHttpAppLink(nonHttpAppLink: SpecialUrlDetector.UrlType.NonHttpAppLink, isRedirect: Boolean): Boolean
     fun openMessageInNewTab(message: Message)
     fun recoverFromRenderProcessGone()
     fun requiresAuthentication(request: BasicAuthenticationRequest)
@@ -59,6 +61,7 @@ interface WebViewClientListener {
 
     fun loginDetected()
     fun dosAttackDetected()
-    fun iconReceived(icon: Bitmap)
+    fun iconReceived(url: String, icon: Bitmap)
+    fun iconReceived(visitedUrl: String, iconUrl: String)
     fun prefetchFavicon(url: String)
 }

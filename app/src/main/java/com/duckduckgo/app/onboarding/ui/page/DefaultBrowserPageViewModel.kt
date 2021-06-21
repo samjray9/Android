@@ -22,13 +22,12 @@ import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
 import com.duckduckgo.app.global.SingleLiveEvent
 import com.duckduckgo.app.global.install.AppInstallStore
 import com.duckduckgo.app.global.plugins.view_model.ViewModelFactoryPlugin
+import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.di.scopes.AppObjectGraph
-import com.squareup.anvil.annotations.ContributesTo
-import dagger.Module
-import dagger.Provides
-import dagger.multibindings.IntoSet
-import javax.inject.Singleton
+import com.squareup.anvil.annotations.ContributesMultibinding
+import javax.inject.Inject
+import javax.inject.Provider
 
 class DefaultBrowserPageViewModel(
     private val defaultBrowserDetector: DefaultBrowserDetector,
@@ -68,7 +67,7 @@ class DefaultBrowserPageViewModel(
     fun pageBecameVisible() {
         if (!viewHasShown) {
             viewHasShown = true
-            pixel.fire(Pixel.PixelName.ONBOARDING_DEFAULT_BROWSER_VISUALIZED)
+            pixel.fire(AppPixelName.ONBOARDING_DEFAULT_BROWSER_VISUALIZED)
         }
     }
 
@@ -80,7 +79,7 @@ class DefaultBrowserPageViewModel(
 
     fun onContinueToBrowser(userTriedToSetDDGAsDefault: Boolean) {
         if (!userTriedToSetDDGAsDefault && !defaultBrowserDetector.isDefaultBrowser()) {
-            pixel.fire(Pixel.PixelName.ONBOARDING_DEFAULT_BROWSER_SKIPPED)
+            pixel.fire(AppPixelName.ONBOARDING_DEFAULT_BROWSER_SKIPPED)
         }
         command.value = Command.ContinueToBrowser
     }
@@ -99,7 +98,7 @@ class DefaultBrowserPageViewModel(
         val params = mapOf(
             Pixel.PixelParameter.DEFAULT_BROWSER_BEHAVIOUR_TRIGGERED to behaviourTriggered
         )
-        pixel.fire(Pixel.PixelName.ONBOARDING_DEFAULT_BROWSER_LAUNCHED, params)
+        pixel.fire(AppPixelName.ONBOARDING_DEFAULT_BROWSER_LAUNCHED, params)
     }
 
     fun handleResult(origin: Origin) {
@@ -154,7 +153,7 @@ class DefaultBrowserPageViewModel(
             if (timesPressedJustOnce < MAX_DIALOG_ATTEMPTS) {
                 timesPressedJustOnce++
                 command.value = Command.OpenDialog()
-                pixel.fire(Pixel.PixelName.ONBOARDING_DEFAULT_BROWSER_SELECTED_JUST_ONCE)
+                pixel.fire(AppPixelName.ONBOARDING_DEFAULT_BROWSER_SELECTED_JUST_ONCE)
             } else {
                 fireDefaultBrowserPixelAndResetTimesPressedJustOnce(originValue = Pixel.PixelValues.DEFAULT_BROWSER_JUST_ONCE_MAX)
                 navigateToBrowser = true
@@ -171,13 +170,13 @@ class DefaultBrowserPageViewModel(
                 Pixel.PixelParameter.DEFAULT_BROWSER_SET_FROM_ONBOARDING to true.toString(),
                 Pixel.PixelParameter.DEFAULT_BROWSER_SET_ORIGIN to originValue
             )
-            pixel.fire(Pixel.PixelName.DEFAULT_BROWSER_SET, params)
+            pixel.fire(AppPixelName.DEFAULT_BROWSER_SET, params)
         } else {
             installStore.defaultBrowser = false
             val params = mapOf(
                 Pixel.PixelParameter.DEFAULT_BROWSER_SET_ORIGIN to originValue
             )
-            pixel.fire(Pixel.PixelName.DEFAULT_BROWSER_NOT_SET, params)
+            pixel.fire(AppPixelName.DEFAULT_BROWSER_NOT_SET, params)
         }
     }
 
@@ -201,30 +200,16 @@ class DefaultBrowserPageViewModel(
     }
 }
 
-@Module
-@ContributesTo(AppObjectGraph::class)
-class DefaultBrowserPageViewModelFactoryModule {
-    @Provides
-    @Singleton
-    @IntoSet
-    fun provideDefaultBrowserPageViewModelFactory(
-        defaultBrowserDetector: DefaultBrowserDetector,
-        pixel: Pixel,
-        installStore: AppInstallStore
-    ): ViewModelFactoryPlugin {
-        return DefaultBrowserPageViewModelFactory(defaultBrowserDetector, pixel, installStore)
-    }
-}
-
-private class DefaultBrowserPageViewModelFactory(
-    private val defaultBrowserDetector: DefaultBrowserDetector,
-    private val pixel: Pixel,
-    private val installStore: AppInstallStore
+@ContributesMultibinding(AppObjectGraph::class)
+class DefaultBrowserPageViewModelFactory @Inject constructor(
+    private val defaultBrowserDetector: Provider<DefaultBrowserDetector>,
+    private val pixel: Provider<Pixel>,
+    private val installStore: Provider<AppInstallStore>
 ) : ViewModelFactoryPlugin {
     override fun <T : ViewModel?> create(modelClass: Class<T>): T? {
         with(modelClass) {
             return when {
-                isAssignableFrom(DefaultBrowserPageViewModel::class.java) -> (DefaultBrowserPageViewModel(defaultBrowserDetector, pixel, installStore) as T)
+                isAssignableFrom(DefaultBrowserPageViewModel::class.java) -> (DefaultBrowserPageViewModel(defaultBrowserDetector.get(), pixel.get(), installStore.get()) as T)
                 else -> null
             }
         }

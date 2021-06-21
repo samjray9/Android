@@ -32,7 +32,17 @@ android {
         sourceSets {
             androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
             androidTest.resources.srcDirs += files("$projectDir/../submodules/".toString())
+            main {
+                java {
+                    resources {
+                        srcDirs += files("$projectDir/../submodules/autofill/dist/".toString())
+                    }
+                }
+            }
         }
+    }
+    buildFeatures {
+        viewBinding = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -115,6 +125,7 @@ android {
 dependencies {
     implementation project(path: ':statistics')
     implementation project(path: ':common')
+    implementation project(path: ':common-ui')
     implementation project(path: ':di')
 
     implementation AndroidX.legacy.supportV4
@@ -134,6 +145,7 @@ dependencies {
     implementation AndroidX.appCompat
     implementation Google.android.material
     implementation AndroidX.constraintLayout
+    implementation AndroidX.recyclerView
     implementation AndroidX.swipeRefreshLayout
     implementation AndroidX.webkit
     implementation Square.okHttp3.okHttp
@@ -151,18 +163,15 @@ dependencies {
     // RxRelay
     implementation "com.jakewharton.rxrelay2:rxrelay:_"
 
-    // Anko
-    implementation "org.jetbrains.anko:anko-commons:_"
-    implementation "org.jetbrains.anko:anko-design:_"
-
     // Android KTX
     implementation AndroidX.core.ktx
     implementation AndroidX.fragmentKtx
 
     // ViewModel and LiveData
-    implementation AndroidX.lifecycle.extensions
+    implementation AndroidX.lifecycle.runtimeKtx
     implementation AndroidX.lifecycle.viewModelKtx
     implementation AndroidX.lifecycle.liveDataKtx
+    implementation AndroidX.lifecycle.process
 
     implementation  AndroidX.lifecycle.commonJava8
     testImplementation AndroidX.archCore.testing
@@ -192,8 +201,14 @@ dependencies {
     // Lottie
     implementation "com.airbnb.android:lottie:_"
 
+    // Security crypto
+    implementation AndroidX.security.crypto
+
     // Play Store referrer library
     playImplementation("com.android.installreferrer:installreferrer:_")
+
+    // HTML
+    implementation 'org.jsoup:jsoup:_'
 
     // Testing dependencies
     androidTestImplementation AndroidX.test.runner
@@ -203,4 +218,11 @@ dependencies {
     androidTestImplementation Testing.mockito.kotlin
     androidTestImplementation Square.okHttp3.mockWebServer
     androidTestImplementation "org.jetbrains.kotlin:kotlin-reflect:_"
+    androidTestImplementation 'app.cash.turbine:turbine:_'
+}
+
+tasks.register('fastlaneVersionCode') {
+    doLast {
+        print buildVersionCode()
+    }
 }

@@ -28,7 +28,7 @@ import com.duckduckgo.app.global.DuckDuckGoActivity
 import com.duckduckgo.app.global.view.gone
 import com.duckduckgo.app.global.view.show
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.SURVEY_SURVEY_DISMISSED
+import com.duckduckgo.app.pixels.AppPixelName.SURVEY_SURVEY_DISMISSED
 import com.duckduckgo.app.survey.model.Survey
 import com.duckduckgo.app.survey.ui.SurveyViewModel.Command
 import com.duckduckgo.app.survey.ui.SurveyViewModel.Command.*
@@ -134,7 +134,6 @@ class SurveyActivity : DuckDuckGoActivity() {
         webView.gone()
         surveyActivityContainerViewGroup.removeView(webView)
         webView.destroy()
-        webView.webViewClient = null
     }
 
     companion object {

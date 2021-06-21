@@ -26,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
 import com.duckduckgo.app.global.intentText
+import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.systemsearch.SystemSearchActivity
 import timber.log.Timber
@@ -52,6 +53,13 @@ class DataClearerForegroundAppRestartPixel @Inject constructor(
         get() = preferences.getInt(KEY_UNSENT_CLEAR_APP_RESTARTED_WITH_INTENT_PIXELS, 0)
 
     @UiThread
+    @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
+    fun onAppCreated() {
+        Timber.i("onAppCreated firePendingPixels")
+        firePendingPixels()
+    }
+
+    @UiThread
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     fun onAppBackgrounded() {
         Timber.i("Registered App on_stop")
@@ -73,8 +81,8 @@ class DataClearerForegroundAppRestartPixel @Inject constructor(
     }
 
     fun firePendingPixels() {
-        firePendingPixels(pendingAppForegroundRestart, Pixel.PixelName.FORGET_ALL_AUTO_RESTART)
-        firePendingPixels(pendingAppForegroundRestartWithIntent, Pixel.PixelName.FORGET_ALL_AUTO_RESTART_WITH_INTENT)
+        firePendingPixels(pendingAppForegroundRestart, AppPixelName.FORGET_ALL_AUTO_RESTART)
+        firePendingPixels(pendingAppForegroundRestartWithIntent, AppPixelName.FORGET_ALL_AUTO_RESTART_WITH_INTENT)
         resetCount()
     }
 

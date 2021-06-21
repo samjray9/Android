@@ -29,9 +29,9 @@ import com.duckduckgo.app.global.db.AppDatabase
 import com.duckduckgo.app.global.events.db.UserEventEntity
 import com.duckduckgo.app.global.events.db.UserEventKey.*
 import com.duckduckgo.app.global.events.db.UserEventsStore
+import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.runBlocking
 import com.duckduckgo.app.settings.db.SettingsDataStore
-import com.duckduckgo.app.statistics.Variant
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.nhaarman.mockitokotlin2.mock
@@ -91,7 +91,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onFireproofLoginDialogShown()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DIALOG_SHOWN,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DIALOG_SHOWN,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "false")
         )
     }
@@ -103,7 +103,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onFireproofLoginDialogShown()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DIALOG_SHOWN,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DIALOG_SHOWN,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "true")
         )
     }
@@ -113,7 +113,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserConfirmedFireproofDialog("twitter.com")
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_WEBSITE_LOGIN_ADDED,
+            pixel = AppPixelName.FIREPROOF_WEBSITE_LOGIN_ADDED,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "false")
         )
     }
@@ -125,7 +125,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserConfirmedFireproofDialog("twitter.com")
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_WEBSITE_LOGIN_ADDED,
+            pixel = AppPixelName.FIREPROOF_WEBSITE_LOGIN_ADDED,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "true")
         )
     }
@@ -150,7 +150,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserDismissedFireproofLoginDialog()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_WEBSITE_LOGIN_DISMISS,
+            pixel = AppPixelName.FIREPROOF_WEBSITE_LOGIN_DISMISS,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "false")
         )
     }
@@ -161,23 +161,20 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserDismissedFireproofLoginDialog()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_WEBSITE_LOGIN_DISMISS,
+            pixel = AppPixelName.FIREPROOF_WEBSITE_LOGIN_DISMISS,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "true")
         )
     }
 
     @Test
-    fun whenExpVariantUserDismissedFireproofLoginDialogwThenRegisterEvent() = coroutineRule.runBlocking {
-        givenFireproofLoginExperimentEnabled()
-
+    fun whenUserDismissedFireproofLoginDialogThenRegisterEvent() = coroutineRule.runBlocking {
         testee.onUserDismissedFireproofLoginDialog()
 
         verify(mockUserEventsStore).registerUserEvent(FIREPROOF_LOGIN_DIALOG_DISMISSED)
     }
 
     @Test
-    fun whenExpVariantUserDismissedFireproofLoginDialogTwiceInRowThenAskToDisableLoginDetection() = coroutineRule.runBlocking {
-        givenFireproofLoginExperimentEnabled()
+    fun whenUserDismissedFireproofLoginDialogTwiceInRowThenAskToDisableLoginDetection() = coroutineRule.runBlocking {
         givenUserPreviouslyDismissedDialog()
 
         testee.onUserDismissedFireproofLoginDialog()
@@ -187,8 +184,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
     }
 
     @Test
-    fun whenExpVariantUserEnabledFireproofLoginDetectionThenNeverAskToDisableIt() = coroutineRule.runBlocking {
-        givenFireproofLoginExperimentEnabled()
+    fun whenUserEnabledFireproofLoginDetectionThenNeverAskToDisableIt() = coroutineRule.runBlocking {
         givenUserEnabledFireproofLoginDetection()
         givenUserPreviouslyDismissedDialog()
 
@@ -199,8 +195,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
     }
 
     @Test
-    fun whenExpVariantUserDidNotDisableLoginDetectionThenNeverAskToDisableItAgain() = coroutineRule.runBlocking {
-        givenFireproofLoginExperimentEnabled()
+    fun whenUserDidNotDisableLoginDetectionThenNeverAskToDisableItAgain() = coroutineRule.runBlocking {
         givenUserDidNotDisableLoginDetection()
         givenUserPreviouslyDismissedDialog()
 
@@ -215,7 +210,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onDisableLoginDetectionDialogShown()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_SHOWN,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_SHOWN,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "false")
         )
     }
@@ -225,7 +220,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserConfirmedDisableLoginDetectionDialog()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_DISABLE,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_DISABLE,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "false")
         )
     }
@@ -237,7 +232,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserConfirmedDisableLoginDetectionDialog()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_DISABLE,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_DISABLE,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "true")
         )
     }
@@ -254,7 +249,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserDismissedDisableLoginDetectionDialog()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_CANCEL,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_CANCEL,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "false")
         )
     }
@@ -266,7 +261,7 @@ class BrowserTabFireproofDialogsEventHandlerTest {
         testee.onUserDismissedDisableLoginDetectionDialog()
 
         verify(mockPixel).fire(
-            pixel = Pixel.PixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_CANCEL,
+            pixel = AppPixelName.FIREPROOF_LOGIN_DISABLE_DIALOG_CANCEL,
             parameters = mapOf(Pixel.PixelParameter.FIRE_EXECUTED to "true")
         )
     }
@@ -291,16 +286,6 @@ class BrowserTabFireproofDialogsEventHandlerTest {
     private suspend fun givenUserPreviouslyDismissedDialog() {
         whenever(mockUserEventsStore.getUserEvent(FIREPROOF_LOGIN_DIALOG_DISMISSED))
             .thenReturn(UserEventEntity(FIREPROOF_LOGIN_DIALOG_DISMISSED))
-    }
-
-    private fun givenFireproofLoginExperimentEnabled() {
-        whenever(mockVariantManager.getVariant()).thenReturn(
-            Variant(
-                key = "",
-                features = listOf(VariantManager.VariantFeature.LoginDetectionEnabled),
-                filterBy = { true }
-            )
-        )
     }
 
     private suspend fun givenUserTriedFireButton() {

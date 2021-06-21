@@ -16,6 +16,11 @@ or alternatively using `brew install fastlane`
 
 # Available Actions
 ## Android
+### android deploy_playstore
+```
+fastlane android deploy_playstore
+```
+Upload APK to Play Store
 ### android deploy_github
 ```
 fastlane android deploy_github

@@ -23,7 +23,7 @@ import com.duckduckgo.app.global.toHttps
 import com.duckduckgo.app.httpsupgrade.store.HttpsFalsePositivesDao
 import com.duckduckgo.app.privacy.db.UserWhitelistDao
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.*
+import com.duckduckgo.app.pixels.AppPixelName.*
 import timber.log.Timber
 import java.util.concurrent.locks.ReentrantLock
 
@@ -54,31 +54,23 @@ class HttpsUpgraderImpl(
     override fun shouldUpgrade(uri: Uri): Boolean {
 
         if (uri.isHttps) {
-            pixel.fire(HTTPS_NO_LOOKUP)
             return false
         }
 
-        val host = uri.host
-        if (host == null) {
-            pixel.fire(HTTPS_NO_LOOKUP)
-            return false
-        }
+        val host = uri.host ?: return false
 
         if (userAllowListDao.contains(host)) {
-            pixel.fire(HTTPS_NO_LOOKUP)
             Timber.d("$host is in user allowlist and so not upgradable")
             return false
         }
 
         if (bloomFalsePositiveDao.contains(host)) {
-            pixel.fire(HTTPS_NO_LOOKUP)
             Timber.d("$host is in https whitelist and so not upgradable")
             return false
         }
 
         val isUpgradable = isInUpgradeList(host)
         Timber.d("$host ${if (isUpgradable) "is" else "is not"} upgradable")
-        pixel.fire(if (isUpgradable) HTTPS_LOCAL_UPGRADE else HTTPS_NO_UPGRADE)
         return isUpgradable
     }
 

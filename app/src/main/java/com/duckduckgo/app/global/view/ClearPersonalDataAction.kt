@@ -22,6 +22,7 @@ import android.webkit.WebView
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
 import com.duckduckgo.app.browser.WebDataManager
+import com.duckduckgo.app.browser.cookies.ThirdPartyCookieManager
 import com.duckduckgo.app.fire.AppCacheClearer
 import com.duckduckgo.app.fire.DuckDuckGoCookieManager
 import com.duckduckgo.app.fire.FireActivity
@@ -32,7 +33,6 @@ import com.duckduckgo.app.tabs.model.TabRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import javax.inject.Inject
 
 interface ClearDataAction {
 
@@ -45,7 +45,7 @@ interface ClearDataAction {
     fun killAndRestartProcess(notifyDataCleared: Boolean)
 }
 
-class ClearPersonalDataAction @Inject constructor(
+class ClearPersonalDataAction(
     private val context: Context,
     private val dataManager: WebDataManager,
     private val clearingStore: UnsentForgetAllPixelStore,
@@ -53,7 +53,8 @@ class ClearPersonalDataAction @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
     private val cookieManager: DuckDuckGoCookieManager,
     private val appCacheClearer: AppCacheClearer,
-    private val geoLocationPermissions: GeoLocationPermissions
+    private val geoLocationPermissions: GeoLocationPermissions,
+    private val thirdPartyCookieManager: ThirdPartyCookieManager
 ) : ClearDataAction {
 
     override fun killAndRestartProcess(notifyDataCleared: Boolean) {
@@ -70,6 +71,7 @@ class ClearPersonalDataAction @Inject constructor(
         withContext(Dispatchers.IO) {
             cookieManager.flush()
             geoLocationPermissions.clearAllButFireproofed()
+            thirdPartyCookieManager.clearAllData()
             clearTabsAsync(appInForeground)
         }
 

@@ -33,7 +33,6 @@ class AppUserStageStoreTest {
     var coroutineRule = CoroutineTestRule()
 
     private val userStageDao: UserStageDao = mock()
-
     private val testee = AppUserStageStore(userStageDao, coroutineRule.testDispatcherProvider)
 
     @Test
@@ -64,24 +63,6 @@ class AppUserStageStoreTest {
     }
 
     @Test
-    fun whenStageUseOurAppNotificationCompletedThenStageEstablishedReturned() = coroutineRule.runBlocking {
-        givenCurrentStage(AppStage.USE_OUR_APP_NOTIFICATION)
-
-        val nextStage = testee.stageCompleted(AppStage.USE_OUR_APP_NOTIFICATION)
-
-        assertEquals(AppStage.ESTABLISHED, nextStage)
-    }
-
-    @Test
-    fun whenStageUseOurAppOnboardingCompletedThenStageEstablishedReturned() = coroutineRule.runBlocking {
-        givenCurrentStage(AppStage.USE_OUR_APP_ONBOARDING)
-
-        val nextStage = testee.stageCompleted(AppStage.USE_OUR_APP_ONBOARDING)
-
-        assertEquals(AppStage.ESTABLISHED, nextStage)
-    }
-
-    @Test
     fun whenStageEstablishedCompletedThenStageEstablishedReturned() = coroutineRule.runBlocking {
         givenCurrentStage(AppStage.ESTABLISHED)
 
@@ -92,8 +73,8 @@ class AppUserStageStoreTest {
 
     @Test
     fun whenMoveToStageThenUpdateUserStageInDao() = coroutineRule.runBlocking {
-        testee.moveToStage(AppStage.USE_OUR_APP_ONBOARDING)
-        verify(userStageDao).updateUserStage(AppStage.USE_OUR_APP_ONBOARDING)
+        testee.moveToStage(AppStage.DAX_ONBOARDING)
+        verify(userStageDao).updateUserStage(AppStage.DAX_ONBOARDING)
     }
 
     private suspend fun givenCurrentStage(appStage: AppStage) {
